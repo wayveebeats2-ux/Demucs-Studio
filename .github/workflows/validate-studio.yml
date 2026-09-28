@@ -1,0 +1,26 @@
+name: Validate Demucs Studio
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "GUI/StudioMain.py"
+      - "GUI/ui/**"
+      - ".github/workflows/validate-studio.yml"
+  pull_request:
+    paths:
+      - "GUI/StudioMain.py"
+      - "GUI/ui/**"
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile modern UI sources
+        run: python -m py_compile GUI/StudioMain.py GUI/ui/__init__.py GUI/ui/theme.py GUI/ui/drop_zone.py GUI/ui/main_window.py GUI/ui/controller.py
