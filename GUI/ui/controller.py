@@ -39,10 +39,19 @@ class StudioController:
             lambda value,item:self.window.trackProgress.emit(int(item),value),lambda status,item:self.window.trackStatus.emit(int(item),int(status)),self._finished)
     def _save(self,file,origin,tensor,tags,save_func,item,finish_callback):
         try:
-            out_dir=file.parent/"separated"/self.engine.model/file.stem; out_dir.mkdir(parents=True,exist_ok=True); outputs=[]
+            base=self.options.get("output_dir")
+            out_dir=(pathlib.Path(base)/self.engine.model/file.stem) if base else (file.parent/"separated"/self.engine.model/file.stem)
+            out_dir.mkdir(parents=True,exist_ok=True); outputs=[]; policy=self.options.get("collision","rename")
             subtype=self.options.get("subtype","PCM_24")
             for stem,data in tensor.items():
-                output=out_dir/f"{stem}.wav"; result=save_func(output,data,subtype,encoder="sndfile")
+                output=out_dir/f"{stem}.wav"
+                if output.exists():
+                    if policy=="skip": outputs.append((stem,str(output))); continue
+                    if policy=="rename":
+                        n=2
+                        while (out_dir/f"{stem}_{n}.wav").exists(): n+=1
+                        output=out_dir/f"{stem}_{n}.wav"
+                result=save_func(output,data,subtype,encoder="sndfile")
                 if result is not None: raise RuntimeError(str(result))
                 outputs.append((stem,str(output)))
             self.window.resultsReady.emit(int(item),str(out_dir),outputs); finish_callback(shared.FileStatus.Finished,item)
