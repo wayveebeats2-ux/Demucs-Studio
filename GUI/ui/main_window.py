@@ -1,14 +1,14 @@
 from pathlib import Path
-from PySide6.QtCore import Qt,Signal
-from PySide6.QtWidgets import (QComboBox,QDoubleSpinBox,QFileDialog,QFrame,QHBoxLayout,QLabel,QListWidget,QMainWindow,QMessageBox,QProgressBar,QPushButton,QSpinBox,QVBoxLayout,QWidget)
+from PySide6.QtCore import Qt,Signal,QSize
+from PySide6.QtGui import QIcon,QPixmap\nfrom PySide6.QtWidgets import (QComboBox,QDoubleSpinBox,QFileDialog,QFrame,QHBoxLayout,QLabel,QListWidget,QMainWindow,QMessageBox,QProgressBar,QPushButton,QSpinBox,QVBoxLayout,QWidget)
 from ui.drop_zone import DropZone
-from ui.stem_results import StemResults
+from ui.stem_results import StemResults\nfrom ui.media_info import MediaInfoLoader
 from ui.theme import DARK_STYLESHEET
 
 class StudioWindow(QMainWindow):
     deviceChanged=Signal(str); statusChanged=Signal(str); backendReady=Signal(); busyChanged=Signal(bool); modelProgress=Signal(float); trackProgress=Signal(int,float); trackStarted=Signal(int,str); trackStatus=Signal(int,int); trackFinished=Signal(int,int); allFinished=Signal(); errorRaised=Signal(str,str); resultsReady=Signal(int,str,list)
     def __init__(self):
-        super().__init__(); self.controller=None; self.setWindowTitle("Demucs Studio"); self.resize(1120,780); self.setMinimumSize(840,620); self.setStyleSheet(DARK_STYLESHEET); self._build(); self._connect_signals()
+        super().__init__(); self.controller=None; self.setWindowTitle("Demucs Studio"); self.resize(1120,780); self.setMinimumSize(840,620); self.setStyleSheet(DARK_STYLESHEET); self.media=MediaInfoLoader(self); self._build(); self._connect_signals(); self.media.ready.connect(self._metadata_ready)
     def attach_controller(self,c):self.controller=c
     def _build(self):
         root=QWidget(); o=QVBoxLayout(root); o.setContentsMargins(22,22,22,22); o.setSpacing(14)
@@ -27,8 +27,26 @@ class StudioWindow(QMainWindow):
     def add_files(self,files):
         existing={self.queue.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.queue.count())}
         for file in files:
-            if file not in existing:self.queue.addItem(Path(file).name);self.queue.item(self.queue.count()-1).setData(Qt.ItemDataRole.UserRole,file);existing.add(file)
+            if file not in existing:
+                self.queue.addItem("◌  "+Path(file).name+"\n    Reading metadata…"); item=self.queue.item(self.queue.count()-1); item.setData(Qt.ItemDataRole.UserRole,file); item.setSizeHint(QSize(0,58)); existing.add(file); self.media.request(file)
         self._refresh_enabled()
+    @staticmethod
+    def _duration(seconds):
+        seconds=int(seconds or 0); return f"{seconds//60}:{seconds%60:02d}" if seconds else "--:--"
+    @staticmethod
+    def _size(n):
+        return f"{n/1048576:.1f} MB" if n else "—"
+    def _metadata_ready(self,path,info):
+        for i in range(self.queue.count()):
+            item=self.queue.item(i)
+            if item.data(Qt.ItemDataRole.UserRole)==path:
+                title=info.get("title") or Path(path).stem; artist=info.get("artist") or "Unknown artist"
+                item.setText(f"♫  {title}\n    {artist}   •   {self._duration(info.get('duration'))}   •   {self._size(info.get('size'))}")
+                art=info.get("artwork")
+                if art:
+                    px=QPixmap(); px.loadFromData(art); item.setIcon(QIcon(px))
+                    self.queue.setIconSize(QSize(42,42))
+                item.setData(Qt.ItemDataRole.UserRole+1,info); break
     def _refresh_enabled(self):self.separate.setEnabled(self.controller is not None and not self.controller.busy and self.queue.count()>0)
     def start(self):
         if not self.controller:return
