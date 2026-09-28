@@ -9,7 +9,7 @@ from PySide6.QtMultimedia import QAudioOutput,QMediaPlayer
 class _MixSignals(QObject):
     ready=Signal(int,str); failed=Signal(int,str)
 class _MixTask(QRunnable):
-    def __init__(self,key,stems,state): super().__init__(); self.key=key; self.stems=stems; self.state=state; self.signals=_MixSignals()
+    def __init__(self,key,stems,state,target=None): super().__init__(); self.key=key; self.stems=stems; self.state=state; self.target=target; self.signals=_MixSignals()
     def run(self):
         try:
             loaded=[]; sr=None; maxlen=0
@@ -30,7 +30,7 @@ class _MixTask(QRunnable):
                 mix[:len(data)]+=data
             peak=float(np.max(np.abs(mix),initial=0));
             if peak>0.999:mix*=0.999/peak
-            out=Path(tempfile.gettempdir())/f"demucs_studio_audition_{self.key}.wav"; sf.write(out,mix,sr,subtype="PCM_24"); self.signals.ready.emit(self.key,str(out))
+            out=Path(self.target) if self.target else Path(tempfile.gettempdir())/f"demucs_studio_audition_{self.key}.wav"; sf.write(out,mix,sr,subtype="PCM_24"); self.signals.ready.emit(self.key,str(out))
         except Exception as exc:self.signals.failed.emit(self.key,str(exc))
 
 class AuditionMixer(QObject):
@@ -39,6 +39,8 @@ class AuditionMixer(QObject):
         super().__init__(parent); self.pool=QThreadPool.globalInstance(); self.audio=QAudioOutput(self); self.player=QMediaPlayer(self); self.player.setAudioOutput(self.audio); self.tasks=[]
     def render_and_play(self,key,stems,state):
         self.player.stop(); task=_MixTask(key,stems,state); task.signals.ready.connect(self._play); task.signals.failed.connect(self.failed); self.tasks.append(task); self.pool.start(task)
+    def export(self,key,stems,state,target,callback=None):
+        task=_MixTask(key,stems,state,target); task.signals.ready.connect(lambda k,p: callback(p) if callback else None); task.signals.failed.connect(self.failed); self.tasks.append(task); self.pool.start(task)
     def _play(self,key,path):self.player.setSource(QUrl.fromLocalFile(path));self.player.setPosition(0);self.player.play();self.ready.emit(key)
     def pause(self):self.player.pause()
     def stop(self):self.player.stop();self.player.setPosition(0)
