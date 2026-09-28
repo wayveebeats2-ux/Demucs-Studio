@@ -1,0 +1,44 @@
+"""Sample-aligned audition mixer for separated stems."""
+import tempfile
+from pathlib import Path
+import numpy as np
+import soundfile as sf
+from PySide6.QtCore import QObject,QRunnable,QThreadPool,Signal,QUrl
+from PySide6.QtMultimedia import QAudioOutput,QMediaPlayer
+
+class _MixSignals(QObject):
+    ready=Signal(int,str); failed=Signal(int,str)
+class _MixTask(QRunnable):
+    def __init__(self,key,stems,state): super().__init__(); self.key=key; self.stems=stems; self.state=state; self.signals=_MixSignals()
+    def run(self):
+        try:
+            loaded=[]; sr=None; maxlen=0
+            soloed={k for k,v in self.state.items() if v.get("solo")}
+            for name,path in self.stems:
+                cfg=self.state.get(name,{}); active=(name in soloed) if soloed else not cfg.get("mute",False)
+                if not active: continue
+                data,rate=sf.read(path,dtype="float32",always_2d=True)
+                if sr is None:sr=rate
+                if rate!=sr:raise RuntimeError("Stem sample rates do not match")
+                gain=10**(float(cfg.get("db",0.0))/20.0); data=data*gain; loaded.append(data); maxlen=max(maxlen,len(data))
+            if not loaded:raise RuntimeError("No stems are active")
+            channels=max(x.shape[1] for x in loaded); mix=np.zeros((maxlen,channels),dtype=np.float32)
+            for data in loaded:
+                if data.shape[1]!=channels:
+                    if data.shape[1]==1: data=np.repeat(data,channels,axis=1)
+                    else: raise RuntimeError("Stem channel layouts do not match")
+                mix[:len(data)]+=data
+            peak=float(np.max(np.abs(mix),initial=0));
+            if peak>0.999:mix*=0.999/peak
+            out=Path(tempfile.gettempdir())/f"demucs_studio_audition_{self.key}.wav"; sf.write(out,mix,sr,subtype="PCM_24"); self.signals.ready.emit(self.key,str(out))
+        except Exception as exc:self.signals.failed.emit(self.key,str(exc))
+
+class AuditionMixer(QObject):
+    ready=Signal(int); failed=Signal(int,str)
+    def __init__(self,parent=None):
+        super().__init__(parent); self.pool=QThreadPool.globalInstance(); self.audio=QAudioOutput(self); self.player=QMediaPlayer(self); self.player.setAudioOutput(self.audio); self.tasks=[]
+    def render_and_play(self,key,stems,state):
+        self.player.stop(); task=_MixTask(key,stems,state); task.signals.ready.connect(self._play); task.signals.failed.connect(self.failed); self.tasks.append(task); self.pool.start(task)
+    def _play(self,key,path):self.player.setSource(QUrl.fromLocalFile(path));self.player.setPosition(0);self.player.play();self.ready.emit(key)
+    def pause(self):self.player.pause()
+    def stop(self):self.player.stop();self.player.setPosition(0)
