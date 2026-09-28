@@ -58,7 +58,7 @@ class StudioWindow(QMainWindow):
     def _progress(self,row,value):
         self.progress.setValue(int(value*100)); name=Path(self.queue.item(row).data(Qt.ItemDataRole.UserRole)).name; self._set_row(row,f"⏳ {name}  •  {int(value*100)}%")
     def _finished(self,row,status):
-        name=Path(self.queue.item(row).data(Qt.ItemDataRole.UserRole)).name; self._set_row(row,("✓ " if status==4 else "✕ ")+name)
+        name=Path(self.queue.item(row).data(Qt.ItemDataRole.UserRole)).name; self._set_row(row,("✓ " if status==5 else "✕ ")+name)
     def _set_row(self,row,text):
         if 0<=row<self.queue.count(): self.queue.item(row).setText(text)
     def _error(self,title,message): QMessageBox.critical(self,title,message)
