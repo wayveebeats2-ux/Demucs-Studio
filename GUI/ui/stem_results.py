@@ -22,6 +22,7 @@ class StemResults(QFrame):
     def __init__(self,parent=None):
         super().__init__(parent); self.setObjectName("panel"); self.groups={}; self.waveforms={}; self.loader=WaveformLoader(self); self.loader.ready.connect(self._wave_ready); self.mixer=AuditionMixer(self); self.drum_mixer=AuditionMixer(self); self.active_row=None; self.active_drum_row=None; self.transport_slider=None; self.time_label=None; self.play_button=None; self.expanded=[]
         self.mixer.positionChanged.connect(self._active_position); self.mixer.durationChanged.connect(self._active_duration); self.mixer.playingChanged.connect(self._active_playing)
+        self.drum_mixer.positionChanged.connect(self._active_drum_position); self.drum_mixer.durationChanged.connect(self._active_drum_duration); self.drum_mixer.playingChanged.connect(self._active_drum_playing)
         self.layout=QVBoxLayout(self); title=QLabel("♫  RESULTS"); title.setObjectName("section"); self.layout.addWidget(title); self.hint=QLabel("Completed stems will appear here."); self.hint.setObjectName("muted"); self.layout.addWidget(self.hint); self.result_widgets=[]
     def _clear_current_result(self):
         self.mixer.stop(); self.drum_mixer.stop()
@@ -50,7 +51,7 @@ class StemResults(QFrame):
             solo.toggled.connect(lambda v,r=row,s=stem:self._state(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=stem:self._state(r,s,"mute",v)); volume.valueChanged.connect(lambda v,r=row,s=stem:self._state(r,s,"db",float(v)))
             group.setdefault("controls",{})[stem]={"solo":solo,"mute":mute,"volume":volume}
             if stem.lower()=="drums":
-                disclosure=QPushButton("▶"); disclosure.setFlat(True); disclosure.setFixedSize(22,22); disclosure.setCursor(Qt.CursorShape.PointingHandCursor); disclosure.setStyleSheet("QPushButton { border: none; background: transparent; padding: 0; font-size: 11px; } QPushButton:hover { color: #b995ff; }"); disclosure.hide(); disclosure.clicked.connect(lambda checked=False,r=row:self._toggle_drum_children(r)); name_layout.addWidget(name); name_layout.addWidget(disclosure); name_layout.addStretch(); group["drum_disclosure"]=disclosure
+                disclosure=QPushButton("▶"); disclosure.setFlat(True); disclosure.setFixedSize(22,22); disclosure.setCursor(Qt.CursorShape.PointingHandCursor); disclosure.setStyleSheet("QPushButton { border: none; background: transparent; padding: 0; font-size: 11px; } QPushButton:hover { color: #b995ff; }"); disclosure.hide(); disclosure.clicked.connect(lambda checked=False,r=row:self._toggle_drum_children(r)); name_layout.addWidget(name); name_layout.addWidget(disclosure); name_layout.addStretch(); group["drum_disclosure"]=disclosure; group["drum_wave"]=wave
             if stem.lower()!="drums": name_layout.addWidget(name); name_layout.addStretch()
             name_box.setMinimumWidth(118); line.addWidget(name_box); line.addWidget(solo); line.addWidget(mute); line.addWidget(volume); line.addWidget(wave,1); self._layout_widget(line)
             if stem.lower()=="drums":
@@ -70,12 +71,13 @@ class StemResults(QFrame):
         while layout.count():
             item=layout.takeAt(0)
             if item.widget():item.widget().deleteLater()
-        g["drum_substems"]=list(outputs); g["drum_state"]={stem:{"mute":False,"solo":False,"db":0.0} for stem,_ in outputs}
-        audition=QPushButton("▶ Audition Drum Stems"); audition.setObjectName("primary"); audition.setMinimumHeight(40); audition.clicked.connect(lambda checked=False,r=row:self._toggle_drum_mix(r)); layout.addWidget(audition); g["drum_play_button"]=audition
+        g["drum_substems"]=list(outputs); g["drum_state"]={stem:{"mute":False,"solo":False,"db":0.0} for stem,_ in outputs}; g["drum_waves"]=[]
+        if g.get("drum_wave") is not None: g["drum_wave"].drumRefineCompleted=True; g["drum_wave"].allowDrumRefine=False
+        audition=QPushButton("▶ Audition Drum Stems"); audition.setObjectName("primary"); audition.setMinimumHeight(40); audition.clicked.connect(lambda checked=False,r=row:self._open_drum_mixer(r)); layout.addWidget(audition); g["drum_play_button"]=audition
         for stem,file in outputs:
             key="drum:"+stem
             row_widget=QWidget(); row_widget.setFixedHeight(30); line=QHBoxLayout(row_widget); line.setContentsMargins(0,0,0,0); line.setSpacing(7); name=QLabel("↳  "+stem.title()); name.setObjectName("muted"); name.setFixedWidth(92); solo=QCheckBox("S"); solo.setFixedWidth(42); mute=QCheckBox("M"); mute.setFixedWidth(42); gain=QSlider(Qt.Orientation.Horizontal); gain.setRange(-24,6); gain.setValue(0); gain.setFixedWidth(76); wave=WaveformWidget(); wave.setFixedHeight(24)
-            self.waveforms[file]=wave; g.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._drum_wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=key,f=file:self._expand_drum_wave(r,s,f))
+            self.waveforms[file]=wave; g.setdefault("drum_waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._drum_wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=key,f=file:self._expand_drum_wave(r,s,f))
             solo.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"mute",v)); gain.valueChanged.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"db",float(v)))
             g.setdefault("controls",{})[key]={"solo":solo,"mute":mute,"volume":gain}; line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(gain); line.addWidget(wave,1); layout.addWidget(row_widget); self.loader.request(file)
         g["drum_children_height"]=56 + (33*len(outputs)); g["drum_disclosure"].show(); g["drum_children_widget"].setFixedHeight(g["drum_children_height"]); g["drum_children_widget"].show(); g["drum_disclosure"].setText("▼")
@@ -84,12 +86,41 @@ class StemResults(QFrame):
         g=self.groups[row]; g["drum_state"][stem][field]=value
         if row==self.active_drum_row:self.drum_mixer.apply_state()
 
-    def _toggle_drum_mix(self,row):
+    def _ensure_drum_loaded(self,row):
         g=self.groups[row]
-        if self.active_drum_row==row and self.drum_mixer.players:
-            self.drum_mixer.play_pause(); return
-        self.mixer.pause(); self.active_drum_row=row
-        self.drum_mixer.load(int(abs(row)+10000000),g.get("drum_substems",[]),g.get("drum_state",{})); self.drum_mixer.play()
+        if self.active_drum_row!=row or not self.drum_mixer.players:
+            self.mixer.pause(); self.active_drum_row=row
+            self.drum_mixer.load(int(abs(row)+10000000),g.get("drum_substems",[]),g.get("drum_state",{}))
+
+    def _toggle_drum_mix(self,row):
+        self._ensure_drum_loaded(row); self.drum_mixer.play_pause()
+
+    def _open_drum_mixer(self,row):
+        g=self.groups.get(row)
+        if not g or not g.get("drum_substems"):return
+        existing=g.get("drum_dialog")
+        if existing is not None and existing.isVisible(): existing.raise_(); existing.activateWindow(); return
+        dlg=QDialog(self); dlg.setWindowTitle("Drum Mixer • "+Path(g["folder"]).name); dlg.resize(980,520); dlg.setMinimumSize(700,400); g["drum_dialog"]=dlg
+        v=QVBoxLayout(dlg); top=QHBoxLayout(); title=QLabel("DRUM MIXER"); title.setObjectName("section"); drum_clock=QLabel("0:00 / 0:00"); drum_clock.setObjectName("muted"); top.addWidget(title); top.addStretch(); top.addWidget(drum_clock); v.addLayout(top)
+        timeline=SeekSlider(Qt.Orientation.Horizontal); timeline.setRange(0,0); timeline.sliderMoved.connect(lambda ms,r=row:self._drum_seek(r,ms)); v.addWidget(timeline); g["drum_timeline"]=timeline; g["drum_clock"]=drum_clock; g["drum_popup_waves"]=[]
+        for stem,file in g["drum_substems"]:
+            line=QHBoxLayout(); name=QLabel(stem.title()); name.setMinimumWidth(90); solo=QCheckBox("Solo"); mute=QCheckBox("Mute"); gain=QSlider(Qt.Orientation.Horizontal); gain.setRange(-24,6); gain.setFixedWidth(130); wave=WaveformWidget(); wave.setMinimumHeight(52); src=self.waveforms.get(file)
+            if src is not None: wave.set_peaks(src.peaks)
+            original=g["controls"].get("drum:"+stem); solo.setChecked(g["drum_state"][stem]["solo"]); mute.setChecked(g["drum_state"][stem]["mute"]); gain.setValue(int(g["drum_state"][stem]["db"]))
+            if original:
+                solo.toggled.connect(original["solo"].setChecked); mute.toggled.connect(original["mute"].setChecked); gain.valueChanged.connect(original["volume"].setValue)
+                original["solo"].toggled.connect(solo.setChecked); original["mute"].toggled.connect(mute.setChecked); original["volume"].valueChanged.connect(gain.setValue)
+            wave.seekRequested.connect(lambda fraction,r=row:self._drum_wave_seek(r,fraction)); g["drum_popup_waves"].append(wave)
+            line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(QLabel("Gain")); line.addWidget(gain); line.addWidget(wave,1); v.addLayout(line)
+        transport=QHBoxLayout(); play=QPushButton("▶ Play"); play.setObjectName("primary"); stop=QPushButton("■ Stop"); play.clicked.connect(lambda checked=False,r=row:self._toggle_drum_mix(r)); stop.clicked.connect(self.drum_mixer.stop); transport.addStretch(); transport.addWidget(play); transport.addWidget(stop); v.addLayout(transport); g["drum_popup_play"]=play
+        dlg.finished.connect(lambda _=0,r=row:self._drum_dialog_closed(r)); dlg.show(); self._ensure_drum_loaded(row)
+
+    def _drum_dialog_closed(self,row):
+        g=self.groups.get(row)
+        if g:g["drum_dialog"]=None
+
+    def _drum_seek(self,row,ms):
+        if row==self.active_drum_row:self.drum_mixer.seek(ms)
 
     def _drum_wave_seek(self,row,fraction):
         if row!=self.active_drum_row:return
@@ -140,6 +171,24 @@ class StemResults(QFrame):
     @staticmethod
     def _fmt(ms):
         sec=max(0,int(ms)//1000); return f"{sec//60}:{sec%60:02d}"
+    def _active_drum_position(self,ms):
+        row=self.active_drum_row; g=self.groups.get(row) if row is not None else None
+        if not g:return
+        duration=self.drum_mixer._duration; progress=float(ms)/duration if duration>0 else 0
+        for wave in g.get("drum_waves",[])+g.get("drum_popup_waves",[]):wave.set_progress(progress)
+        if g.get("drum_timeline") is not None and not g["drum_timeline"].isSliderDown():g["drum_timeline"].setValue(ms)
+        if g.get("drum_clock") is not None:g["drum_clock"].setText(f"{self._fmt(ms)} / {self._fmt(duration)}")
+
+    def _active_drum_duration(self,ms):
+        row=self.active_drum_row; g=self.groups.get(row) if row is not None else None
+        if g and g.get("drum_timeline") is not None:g["drum_timeline"].setRange(0,ms); g["drum_clock"].setText(f"0:00 / {self._fmt(ms)}")
+
+    def _active_drum_playing(self,playing):
+        row=self.active_drum_row; g=self.groups.get(row) if row is not None else None
+        if not g:return
+        if g.get("drum_play_button") is not None:g["drum_play_button"].setText("■ Stop Drum Audition" if playing else "▶ Audition Drum Stems")
+        if g.get("drum_popup_play") is not None:g["drum_popup_play"].setText("Ⅱ Pause" if playing else "▶ Play")
+
     def _active_position(self,ms):
         if self.active_row is not None:self._position(self.active_row,ms)
     def _active_duration(self,ms):
