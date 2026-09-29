@@ -1,125 +1,139 @@
-## [![Icon](./icon/icon_32x32.png)](.) Demucs GUI
-[![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/CarlGao4/Demucs-GUI?include_prereleases&style=plastic)](https://github.com/CarlGao4/Demucs-Gui/releases) [![All downloads](https://demucs-gui.carlgao4.workers.dev/downloads)](https://github.com/CarlGao4/Demucs-Gui/releases) [![GitHub](https://img.shields.io/github/license/carlgao4/demucs-gui?style=plastic)](LICENSE) [![platform](https://img.shields.io/badge/platform-Windows--64bit-blue?style=plastic)](https://github.com/CarlGao4/Demucs-Gui/releases) [![platform](https://img.shields.io/badge/platform-macOS--64bit%20%7C%20ARM64-yellow?style=plastic)](https://github.com/CarlGao4/Demucs-Gui/releases)
+# Demucs Studio
 
-This is a GUI for music separation project `demucs`.
+**A modern, Windows-focused desktop studio for AI-powered stem separation.**
 
-The project aims to let users without any coding experience separate tracks without difficulty. If you have any question about usage or the project, please open an issue to tell us. Since the original project [Demucs](https://github.com/adefossez/demucs) used scientific library `torch`, the packed binaries with environment is very large, and we will only pack binaries for formal releases.
+Demucs Studio is a fork of **Demucs GUI by Carl Gao**, rebuilt around a darker DAW-inspired workflow while preserving the proven Demucs separation backend.
 
-### Donate to me
+> **Project status:** active development. The modern Studio interface is usable, but releases and some workflow features are still being built and tested.
 
-**If you like this project, please consider donating to me.**
+## What Demucs Studio adds
 
-[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://paypal.me/CarlGao4) [paypal.me/CarlGao4](https://paypal.me/CarlGao4)
+- Modern dark Studio interface with GPU/device status
+- Drag-and-drop track importing
+- Embedded metadata and album artwork
+- 4-stem, Vocals + Instrumental, and 6-stem workflows
+- CUDA-accelerated Demucs processing where supported
+- Configurable segment, overlap, shifts, input gain and output depth
+- Configurable output directory and collision handling
+- Real waveform previews for completed stems
+- Click/drag waveform seeking and a seekable main timeline
+- Live synchronized stem auditioning with Solo, Mute and gain controls
+- Resizable expanded waveform views
+- Offline audition-mix export
+- Persistent separation Library with search and folder scanning
+- **DrumSep secondary separation:** right-click a separated Drums waveform and split it further into **Kick, Snare, Cymbals and Toms**
+- Expandable Drum sub-stems with an independent drum-only audition mixer
 
-[![Donate](https://img.shields.io/badge/Donate-Ko--fi-orange.svg)](https://ko-fi.com/O5O11DZVGL) [ko-fi.com/O5O11DZVGL](https://ko-fi.com/O5O11DZVGL)
+## DrumSep workflow
 
-[![Donate](https://img.shields.io/badge/Donate-AliPay-blue.svg)](./donate_alipay.jpg) [AliPay QR Code](./donate_alipay.jpg)
+Demucs Studio treats drum refinement as a second-stage operation rather than a normal full-song model.
 
-<details id="CannotOpen">
-  <summary>Note for macOS users</summary>
+1. Separate a track normally.
+2. Right-click the **Drums** waveform.
+3. Choose **Separate Drums Further…**.
+4. On first use, Demucs Studio downloads and verifies the DrumSep checkpoint.
+5. The Drums row gains an expandable child section containing:
+   - Kick
+   - Snare
+   - Cymbals
+   - Toms
 
-If the application cannot be launched due to the Mac's security protection feature, try the following:
+The child stems use their own audition mixer, so they are **not doubled into the main Vocals / Drums / Bass / Other mix**.
 
-For macOS versions below 15.0:
+DrumSep's native model source names are translated for the Studio UI. Hi-hat material is included in the Cymbals stem rather than provided as a separate output.
 
-1. Right-click on the Demucs-GUI app icon and select "Open".
-2. Click "Open" again in the window that appears as follows.
+## Running the Studio interface from source
 
-![Open Anyway](./mac_open_anyway.png)
+The current development target is Windows with Python 3.11.
 
-For macOS versions 15.0 or greater:
-1. On your Mac, go to System Settings > Privacy & Security > Scroll to the Security section.
-2. If you see a message stating "'Demucs-GUI.app' was blocked to protect your Mac." - to the right of this message, click "Open Anyway".
-3. Enter your login password, then click OK. This will create an override in Gatekeeper, allowing Demucs-GUI to run.
+Clone the repository and create/activate a virtual environment, then install the project dependencies. For the CUDA build, install a CUDA-enabled PyTorch version appropriate for your NVIDIA GPU.
 
-![demucs-gui-macos15-gatekeeper-block-2](./macos15_open_anyway.png)
-</details>
+FFmpeg and FFprobe should be available on your system `PATH`.
 
-## System requirements
-### Installing binaries
-#### System version
-For Windows: At least Windows 8
+Launch the modern interface with:
 
-For Mac: At least macOS 10.15
-
-For Linux: Any system that can install and run python 3.11 (Because I'll pack the binaries using python 3.11). Requires at least glibc 2.27. If you are using xcb, you may need to install `libxcb-cursor0` (package name may vary on different distributions).
-
-#### Hardware
-Memory: About at least 8GB of total memory (physical and swap) would be required. The longer the track you want to separate, the more memory will be required.
-
-GPU: Only NVIDIA GPUs (whose compute capability should be at least 3.5), Intel Arc & Iris Xe Graphics and Apple MPS are supported. At least 2GB of private memory is required.
-
-### Running the codes yourself
-At least Python 3.10 is required. Other requirements please refer to [Installing binaries](#installing-binaries).
-
-## Downloads
-Binaries for download are available on [GitHub Releases](https://github.com/CarlGao4/Demucs-Gui/releases) and [FossHub](https://www.fosshub.com/Demucs-GUI.html). Some files are too large to be uploaded to GitHub, so please refer to FossHub if you cannot find the file you need on GitHub.
-
-## Update History
-
-Please refer to [history.md](history.md).
-
-## Usage
-**If you are using released binaries, please refer to [usage.md](usage.md)**
-
-*This part is written for those who want to run the codes themselves*
-
-### FFmpeg support
-
-FFmpeg is a supported audio reader of Demucs-GUI. Demucs-GUI will try to use FFmpeg as long as it is found in the `PATH` environment variable. Both FFmpeg and FFprobe are required. You can install it from source, use system package manager, download prebuilt binaries or use conda (recommended).
-
-### CPU only on Windows or Apple MPS or CUDA on Linux
-1. Install Python and git. It's recommended to use a virtual environment like conda.
-2. Clone this repository and switch to this branch. You should run `git submodule update --init --recursive` since 1.1a2 version.
-3. Use pip to install all packages in [requirements.txt](requirements.txt).
-
-note: on Linux, PyTorch **with** CUDA is the default.
-```bash
-# For pip
-pip install -r requirements_cuda.txt
-# Conda is not available as this project has dependencies only on PyPI
+```powershell
+python GUI\StudioMain.py
 ```
-4. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song!
 
-### CUDA acceleration (Windows only)
-1. Install Python and git. It's recommended to use a virtual environment like conda.
-2. Clone this repository and switch to this branch. You should run `git submodule update --init --recursive` since 1.1a2 version.
-3. *Skip this step if you don't need to switch the default version of PyTorch.* Install torch with cuda under intructions on [pyTorch official website](https://pytorch.org/get-started/locally/#start-locally). There is no requirement of cuda version, but the version of torch should be 2.0.x (2.1.0 and higher will cause errors sometimes)
-4. Use pip to install all packages in [requirements_cuda.txt](requirements_cuda.txt).
-```bash
-# For pip
-pip install -r requirements_cuda.txt
-# Conda is not available as this project has dependencies only on PyPI
+The original upstream interface remains available as:
+
+```powershell
+python GUI\GuiMain.py
 ```
-5. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the selector `device`, Please use CPU instead or open an issue to tell us if you think this is a problem.
 
-### Accelerate with AMD GPU (Linux only)
-1. Install Python and git. It's recommended to use a virtual environment like conda.
-2. Clone this repository and switch to this branch. You should run `git submodule update --init --recursive` since 1.1a2 version.
-3. *Skip this step if you don't need to switch the default version of PyTorch.* Install torch with cuda under intructions on [pyTorch official website](https://pytorch.org/get-started/locally/#start-locally). There is no requirement of cuda version, but the version of torch should be 2.0.x (2.1.0 and higher will cause errors sometimes)
-4. Use pip to install all packages in [requirements_rocm.txt](requirements_rocm.txt).
-```bash
-# For pip
-pip install -r requirements_rocm.txt
-# Conda is not available as this project has dependencies only on PyPI
+### Example tested development environment
+
+Demucs Studio is currently being developed and tested with:
+
+- Windows 10/11
+- Python 3.11
+- NVIDIA CUDA acceleration
+- PyTorch CUDA build
+- FFmpeg
+- PySide6 / Qt Multimedia
+
+CPU operation remains available through the inherited Demucs backend, although GPU acceleration is strongly preferable for separation speed.
+
+## Current Studio structure
+
+```text
+GUI/
+├── StudioMain.py
+├── GuiMain.py                 # original/upstream GUI entry point
+├── separator.py               # Demucs backend
+├── audio.py
+├── shared.py
+└── ui/
+    ├── main_window.py
+    ├── controller.py
+    ├── stem_results.py
+    ├── audition.py
+    ├── waveform.py
+    ├── media_info.py
+    ├── library_store.py
+    ├── library_view.py
+    ├── drop_zone.py
+    └── theme.py
 ```
-5. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the selector `device`, Please use CPU instead or open an issue to tell us if you think this is a problem.
 
-### Accelerate with Intel GPU
+The Studio UI is intentionally kept separate from the separation backend so UI work does not require replacing the existing Demucs inference pipeline.
 
-**Make sure that you have discrete Intel graphics card or an Intel CPU that is 11th generation or newer with integrated graphics card** (Because we need its driver)
+## Development roadmap
 
-1. Install latest Intel graphics driver ([Windows link](https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html)). This accelerator requires Intel® Arc™ & Iris® Xe Graphics driver (which means, Intel® Arc™ A-Series Graphics, Intel® Iris® Xe Graphics, and Intel® Core™ Ultra Processors with Intel® Arc™ Graphics). Though I would discourage you to use this "accelerator" with integrated graphics card as it may even slower than pure CPU sometimes.
-2. Install Python and git. It's recommended to use a virtual environment like conda.
-3. Clone this repository and switch to this branch. You should run `git submodule update --init --recursive` since 1.1a2 version.
-4. Use pip to install all packages in [requirements_intel_gpu_mkl.txt](requirements_intel_gpu_mkl.txt).
-```bash
-# For pip
-pip install -r requirements_intel_gpu_mkl.txt
-# Conda is not available as this project has dependencies only on PyPI
-```
-5. Run [`GuiMain.py`](GUI/GuiMain.py) and separate your song! If your GPU is not listed in the selector `device`, Please use CPU instead or open an issue to tell us if you think this is a problem.
-6. If it could not start up and sometimes raises an error like `OSError: [WinError 126] Error loading "***\torch\lib\backend_with_compiler.dll" or one of its dependencies`, you may have to manually download libuv and put it in the folder `torch\lib` under your python site packages installation path. One easier way to solve this if you are using conda environment is to run `conda install conda-forge::libuv`.
+Current priorities include:
+
+- Settings page and persistent Studio preferences
+- More robust DrumSep progress/model-management UI
+- Playback synchronization refinements
+- Library detail/reconnect tools
+- Model download/cache management
+- Cancellation and queue improvements
+- Diagnostics/logging
+- UI polish and accessibility
+- Packaging and first Demucs Studio release
+
+## Upstream project and attribution
+
+Demucs Studio is a fork of **[Demucs GUI](https://github.com/CarlGao4/Demucs-Gui)** by **Carl Gao**. The upstream project provides the core GUI/backend foundation this project was built from.
+
+The separation engine is based on **[Demucs](https://github.com/adefossez/demucs)**.
+
+Please support and credit the upstream projects. Their work made Demucs Studio possible.
+
+## License
+
+This repository retains the upstream **GPL-3.0 license**. See [LICENSE](LICENSE) for details.
+
+Third-party components and models remain subject to their respective licenses and terms.
 
 ## Acknowledgements
-This project includes code of [Demucs](https://github.com/adefossez/demucs) under MIT license.
+
+- **Carl Gao** — Demucs GUI
+- **Alexandre Défossez and Demucs contributors** — Demucs
+- **DrumSep contributors** — secondary drum-stem separation model
+- The PyTorch, Qt/PySide and FFmpeg projects
+
+---
+
+**Demucs Studio** — AI-powered stem separation with a workflow built for actually working with the stems.
