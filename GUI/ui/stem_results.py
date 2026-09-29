@@ -1,6 +1,6 @@
 import os,sys,subprocess
 from pathlib import Path
-from PySide6.QtCore import Qt,QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QCheckBox,QFileDialog,QFrame,QHBoxLayout,QLabel,QPushButton,QSlider,QVBoxLayout
 from ui.waveform import WaveformLoader,WaveformWidget
 from ui.audition import AuditionMixer
@@ -21,14 +21,7 @@ class StemResults(QFrame):
             line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(volume); line.addWidget(wave,1); self.layout.addLayout(line); self.loader.request(file)
     def _state(self,row,stem,key,value):
         self.groups[row]["state"][stem][key]=value
-        if row==self.active_row and self.mixer.player.source().isValid():
-            g=self.groups[row]
-            if g.get("rerender_timer") is None:
-                g["rerender_timer"]=QTimer(self); g["rerender_timer"].setSingleShot(True); g["rerender_timer"].timeout.connect(lambda r=row:self._rerender(r))
-            g["rerender_timer"].start(120)
-    def _rerender(self,row):
-        if row!=self.active_row:return
-        g=self.groups[row]; self.mixer.render_and_play(row,g["stems"],g["state"])
+        if row==self.active_row:self.mixer.apply_state()
     def _seek(self,row,ms):
         if row==self.active_row:self.mixer.seek(ms)
     def _wave_seek(self,row,fraction):
@@ -36,9 +29,9 @@ class StemResults(QFrame):
         g=self.groups[row]; duration=g["timeline"].maximum()
         if duration>0:self.mixer.seek(int(duration*max(0.0,min(1.0,fraction))))
     def _toggle_mix(self,row):
-        if self.active_row==row and self.mixer.player.source().isValid():
+        if self.active_row==row and self.mixer.players:
             self.mixer.play_pause(); return
-        self.active_row=row; g=self.groups[row]; self.mixer.render_and_play(row,g["stems"],g["state"])
+        self.active_row=row; g=self.groups[row]; self.mixer.load(row,g["stems"],g["state"]); self.mixer.play()
     def _export_mix(self,row):
         g=self.groups[row]; default=str(Path(g["folder"])/"audition_mix.wav"); target,_=QFileDialog.getSaveFileName(self,"Export audition mix",default,"WAV audio (*.wav)")
         if target:self.mixer.export(row,g["stems"],g["state"],target)
