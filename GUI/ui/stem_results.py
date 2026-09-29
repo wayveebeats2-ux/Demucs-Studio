@@ -36,7 +36,7 @@ class StemResults(QFrame):
                 disclosure=QPushButton("▸"); disclosure.setFixedWidth(26); disclosure.hide(); disclosure.clicked.connect(lambda checked=False,r=row:self._toggle_drum_children(r)); line.insertWidget(0,disclosure); group["drum_disclosure"]=disclosure
             line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(volume); line.addWidget(wave,1); self.layout.addLayout(line)
             if stem.lower()=="drums":
-                children=QWidget(); child_layout=QVBoxLayout(children); child_layout.setContentsMargins(34,2,0,4); child_layout.setSpacing(4); children.hide(); group["drum_children_widget"]=children; group["drum_children_layout"]=child_layout; self.layout.addWidget(children)
+                children=QWidget(); child_layout=QVBoxLayout(children); child_layout.setContentsMargins(34,6,0,8); child_layout.setSpacing(3); children.hide(); group["drum_children_widget"]=children; group["drum_children_layout"]=child_layout; self.layout.addWidget(children)
                 existing_dir=Path(folder)/"drums"; existing=[(n,str(existing_dir/f"{n}.wav")) for n in ("kick","snare","cymbals","toms") if (existing_dir/f"{n}.wav").exists()]
                 if existing:self.add_drum_substems(row,existing)
             self.loader.request(file)
@@ -53,13 +53,13 @@ class StemResults(QFrame):
             item=layout.takeAt(0)
             if item.widget():item.widget().deleteLater()
         g["drum_substems"]=list(outputs); g["drum_state"]={stem:{"mute":False,"solo":False,"db":0.0} for stem,_ in outputs}
-        audition=QPushButton("▶ Audition Drum Stems"); audition.setObjectName("primary"); audition.clicked.connect(lambda checked=False,r=row:self._toggle_drum_mix(r)); layout.addWidget(audition); g["drum_play_button"]=audition
+        audition=QPushButton("▶ Audition Drum Stems"); audition.setObjectName("primary"); audition.setFixedHeight(28); audition.clicked.connect(lambda checked=False,r=row:self._toggle_drum_mix(r)); layout.addWidget(audition); g["drum_play_button"]=audition
         for stem,file in outputs:
             key="drum:"+stem
-            line=QHBoxLayout(); name=QLabel("↳  "+stem.title()); name.setObjectName("muted"); name.setMinimumWidth(90); solo=QCheckBox("S"); mute=QCheckBox("M"); gain=QSlider(Qt.Orientation.Horizontal); gain.setRange(-24,6); gain.setValue(0); gain.setFixedWidth(75); wave=WaveformWidget()
+            row_widget=QWidget(); row_widget.setFixedHeight(30); line=QHBoxLayout(row_widget); line.setContentsMargins(0,0,0,0); line.setSpacing(7); name=QLabel("↳  "+stem.title()); name.setObjectName("muted"); name.setFixedWidth(92); solo=QCheckBox("S"); solo.setFixedWidth(42); mute=QCheckBox("M"); mute.setFixedWidth(42); gain=QSlider(Qt.Orientation.Horizontal); gain.setRange(-24,6); gain.setValue(0); gain.setFixedWidth(76); wave=WaveformWidget(); wave.setFixedHeight(24)
             self.waveforms[file]=wave; g.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._drum_wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=key,f=file:self._expand_drum_wave(r,s,f))
             solo.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"mute",v)); gain.valueChanged.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"db",float(v)))
-            g.setdefault("controls",{})[key]={"solo":solo,"mute":mute,"volume":gain}; line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(gain); line.addWidget(wave,1); layout.addLayout(line); self.loader.request(file)
+            g.setdefault("controls",{})[key]={"solo":solo,"mute":mute,"volume":gain}; line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(gain); line.addWidget(wave,1); layout.addWidget(row_widget); self.loader.request(file)
         g["drum_disclosure"].show(); g["drum_children_widget"].show(); g["drum_disclosure"].setText("▾")
 
     def _drum_state(self,row,stem,field,value):
