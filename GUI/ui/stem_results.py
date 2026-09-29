@@ -1,7 +1,7 @@
 import os,sys,subprocess
 from pathlib import Path
 from PySide6.QtCore import Qt,Signal
-from PySide6.QtWidgets import QCheckBox,QDialog,QFileDialog,QFrame,QHBoxLayout,QLabel,QPushButton,QSlider,QVBoxLayout,QStyle
+from PySide6.QtWidgets import QCheckBox,QDialog,QFileDialog,QFrame,QHBoxLayout,QLabel,QPushButton,QSlider,QVBoxLayout,QStyle,QWidget
 from ui.waveform import WaveformLoader,WaveformWidget
 from ui.audition import AuditionMixer
 
@@ -30,10 +30,47 @@ class StemResults(QFrame):
         for stem,file in outputs:
             line=QHBoxLayout(); name=QLabel("●  "+stem.title()); name.setObjectName("accent"); name.setMinimumWidth(90); solo=QCheckBox("S"); solo.setToolTip("Solo"); mute=QCheckBox("M"); mute.setToolTip("Mute"); volume=QSlider(Qt.Orientation.Horizontal); volume.setRange(-24,6); volume.setValue(0); volume.setFixedWidth(75); volume.setToolTip("Stem audition gain (dB)"); wave=WaveformWidget(); wave.allowDrumRefine=(stem.lower()=="drums"); self.waveforms[file]=wave; group.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=stem,f=file:self._expand_wave(r,s,f)); wave.refineDrumsRequested.connect(lambda r=row,s=stem,f=file:self.drumRefineRequested.emit(r,f,self.groups[r]["folder"]))
             solo.toggled.connect(lambda v,r=row,s=stem:self._state(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=stem:self._state(r,s,"mute",v)); volume.valueChanged.connect(lambda v,r=row,s=stem:self._state(r,s,"db",float(v)))
-            group.setdefault("controls",{})[stem]={"solo":solo,"mute":mute,"volume":volume}; line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(volume); line.addWidget(wave,1); self.layout.addLayout(line); self.loader.request(file)
+            group.setdefault("controls",{})[stem]={"solo":solo,"mute":mute,"volume":volume}
+            if stem.lower()=="drums":
+                disclosure=QPushButton("▸"); disclosure.setFixedWidth(26); disclosure.hide(); disclosure.clicked.connect(lambda checked=False,r=row:self._toggle_drum_children(r)); line.insertWidget(0,disclosure); group["drum_disclosure"]=disclosure
+            line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(volume); line.addWidget(wave,1); self.layout.addLayout(line)
+            if stem.lower()=="drums":
+                children=QWidget(); child_layout=QVBoxLayout(children); child_layout.setContentsMargins(34,2,0,4); child_layout.setSpacing(4); children.hide(); group["drum_children_widget"]=children; group["drum_children_layout"]=child_layout; self.layout.addWidget(children)
+                existing_dir=Path(folder)/"drums"; existing=[(n,str(existing_dir/f"{n}.wav")) for n in ("kick","snare","cymbals","toms") if (existing_dir/f"{n}.wav").exists()]
+                if existing:self.add_drum_substems(row,existing)
+            self.loader.request(file)
+    def _toggle_drum_children(self,row):
+        g=self.groups.get(row); w=g.get("drum_children_widget") if g else None
+        if not w:return
+        show=not w.isVisible(); w.setVisible(show); g["drum_disclosure"].setText("▾" if show else "▸")
+
+    def add_drum_substems(self,row,outputs):
+        g=self.groups.get(row)
+        if not g or g.get("drum_children_layout") is None:return
+        layout=g["drum_children_layout"]
+        while layout.count():
+            item=layout.takeAt(0)
+            if item.widget():item.widget().deleteLater()
+        g["drum_substems"]=list(outputs)
+        for stem,file in outputs:
+            key="drum:"+stem; g["state"][key]={"mute":False,"solo":False,"db":0.0}
+            line=QHBoxLayout(); name=QLabel("↳  "+stem.title()); name.setObjectName("muted"); name.setMinimumWidth(90); solo=QCheckBox("S"); mute=QCheckBox("M"); gain=QSlider(Qt.Orientation.Horizontal); gain.setRange(-24,6); gain.setValue(0); gain.setFixedWidth(75); wave=WaveformWidget()
+            self.waveforms[file]=wave; g.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=key,f=file:self._expand_wave(r,s,f))
+            solo.toggled.connect(lambda v,r=row,s=key:self._substate(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=key:self._substate(r,s,"mute",v)); gain.valueChanged.connect(lambda v,r=row,s=key:self._substate(r,s,"db",float(v)))
+            g.setdefault("controls",{})[key]={"solo":solo,"mute":mute,"volume":gain}; line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(gain); line.addWidget(wave,1); layout.addLayout(line); self.loader.request(file)
+        g["drum_disclosure"].show(); g["drum_children_widget"].show(); g["drum_disclosure"].setText("▾")
+
+    def _substate(self,row,key,field,value):
+        g=self.groups[row]; g["state"][key][field]=value
+        if not any(name==key for name,_ in g["stems"]):
+            path=next((p for n,p in g.get("drum_substems",[]) if "drum:"+n==key),None)
+            if path:g["stems"].append((key,path))
+        if row==self.active_row:
+            self.mixer.stems=g["stems"]; self.mixer.state=g["state"]; self.mixer.apply_state()
+
     def _expand_wave(self,row,stem,file):
         g=self.groups[row]; dlg=QDialog(self); dlg.setWindowTitle(f"{stem.title()} • Expanded Waveform"); dlg.resize(900,300); dlg.setMinimumSize(560,220)
-        v=QVBoxLayout(dlg); top=QHBoxLayout(); title=QLabel(stem.upper()); title.setObjectName("section"); clock=QLabel(g["clock"].text()); clock.setObjectName("muted"); top.addWidget(title); top.addStretch(); top.addWidget(clock); v.addLayout(top)
+        v=QVBoxLayout(dlg); top=QHBoxLayout(); title=QLabel(stem.replace("drum:","").upper()); title.setObjectName("section"); clock=QLabel(g["clock"].text()); clock.setObjectName("muted"); top.addWidget(title); top.addStretch(); top.addWidget(clock); v.addLayout(top)
         wave=WaveformWidget(); wave.setMinimumHeight(130); wave.setMaximumHeight(16777215); wave.setFixedHeight(130); wave.setSizePolicy(wave.sizePolicy().horizontalPolicy(),wave.sizePolicy().Policy.Expanding)
         src=self.waveforms.get(file)
         if src is not None: wave.set_peaks(src.peaks); wave.set_progress(src.progress)
