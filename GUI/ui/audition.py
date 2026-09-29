@@ -40,7 +40,7 @@ class AuditionMixer(QObject):
         self.player.positionChanged.connect(self.positionChanged); self.player.durationChanged.connect(self.durationChanged); self.player.playbackStateChanged.connect(lambda s:self.playingChanged.emit(s==QMediaPlayer.PlaybackState.PlayingState)); self.player.mediaStatusChanged.connect(self._media_status)
     def render_and_play(self,key,stems,state,resume_position=None,resume_playing=None):
         if resume_position is None: resume_position=self.player.position()
-        if resume_playing is None: resume_playing=self.player.playbackState()==QMediaPlayer.PlaybackState.PlayingState
+        if resume_playing is None: resume_playing=(not self.player.source().isValid()) or self.player.playbackState()==QMediaPlayer.PlaybackState.PlayingState
         self._generation+=1; generation=self._generation
         snapshot={name:dict(values) for name,values in state.items()}
         task=_MixTask(key,stems,snapshot,resume=(int(resume_position),bool(resume_playing))); task.signals.ready.connect(lambda k,p,r,g=generation:self._mix_ready(k,p,r,g)); task.signals.failed.connect(self.failed); self.tasks.append(task); self.pool.start(task)
