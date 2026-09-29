@@ -19,10 +19,19 @@ def load():
 def save(items):
     _path().write_text(json.dumps(items,indent=2,ensure_ascii=False),encoding="utf-8")
 
+def _json_safe(value):
+    if isinstance(value,(str,int,float,bool)) or value is None: return value
+    if isinstance(value,bytes): return None
+    if isinstance(value,Path): return str(value)
+    if isinstance(value,dict): return {str(k):_json_safe(v) for k,v in value.items() if not isinstance(v,bytes)}
+    if isinstance(value,(list,tuple)): return [_json_safe(v) for v in value if not isinstance(v,bytes)]
+    return str(value)
+
 def add(source,folder,model,preset,outputs,metadata=None):
     items=load(); key=str(Path(folder).resolve()).lower()
+    clean_meta=_json_safe(metadata or {})
     entry={"source":str(source),"folder":str(folder),"model":model,"preset":preset,
-           "outputs":[[a,b] for a,b in outputs],"metadata":metadata or {},
+           "outputs":[[a,b] for a,b in outputs],"metadata":clean_meta,
            "created":datetime.now().isoformat(timespec="seconds")}
     items=[x for x in items if str(Path(x.get("folder","")).resolve()).lower()!=key]
     items.insert(0,entry); save(items); return entry
