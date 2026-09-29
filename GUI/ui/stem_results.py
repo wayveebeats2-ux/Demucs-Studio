@@ -20,13 +20,13 @@ class SeekSlider(QSlider):
 class StemResults(QFrame):
     def __init__(self,parent=None):
         super().__init__(parent); self.setObjectName("panel"); self.groups={}; self.waveforms={}; self.loader=WaveformLoader(self); self.loader.ready.connect(self._wave_ready); self.mixer=AuditionMixer(self); self.drum_mixer=AuditionMixer(self); self.active_row=None; self.active_drum_row=None; self.transport_slider=None; self.time_label=None; self.play_button=None; self.expanded=[]
-        self.mixer.positionChanged.connect(self._active_position); self.mixer.durationChanged.connect(self._active_duration); self.mixer.playingChanged.connect(self._active_playing)\n        self.layout=QVBoxLayout(self); title=QLabel("♫  RESULTS"); title.setObjectName("section"); self.layout.addWidget(title); self.hint=QLabel("Completed stems will appear here."); self.hint.setObjectName("muted"); self.layout.addWidget(self.hint)
+        self.mixer.positionChanged.connect(self._active_position); self.mixer.durationChanged.connect(self._active_duration); self.mixer.playingChanged.connect(self._active_playing)
+        self.layout=QVBoxLayout(self); title=QLabel("♫  RESULTS"); title.setObjectName("section"); self.layout.addWidget(title); self.hint=QLabel("Completed stems will appear here."); self.hint.setObjectName("muted"); self.layout.addWidget(self.hint)
     def show_results(self,row,folder,outputs):
         self.hint.hide(); divider=QFrame(); divider.setFrameShape(QFrame.Shape.HLine); self.layout.addWidget(divider); group={"folder":folder,"stems":list(outputs),"state":{stem:{"mute":False,"solo":False,"db":0.0} for stem,_ in outputs}}; self.groups[row]=group
         head=QHBoxLayout(); label=QLabel("✓  "+Path(folder).name); label.setObjectName("success"); audition=QPushButton("▶ Play Mix"); audition.setObjectName("primary"); stop=QPushButton("■ Stop"); export=QPushButton("Export Mix"); export.clicked.connect(lambda checked=False,r=row:self._export_mix(r)); open_btn=QPushButton("Open Folder"); audition.clicked.connect(lambda checked=False,r=row:self._toggle_mix(r)); stop.clicked.connect(self.mixer.stop); open_btn.clicked.connect(lambda:self.open_folder(folder)); head.addWidget(label); head.addStretch(); head.addWidget(audition); head.addWidget(stop); head.addWidget(export); head.addWidget(open_btn); self.layout.addLayout(head)
         transport=QHBoxLayout(); timeline=SeekSlider(Qt.Orientation.Horizontal); timeline.setRange(0,0); timeline.setTracking(True); clock=QLabel("0:00 / 0:00"); clock.setObjectName("muted"); timeline.sliderMoved.connect(lambda ms,r=row:self._seek(r,ms)); transport.addWidget(timeline,1); transport.addWidget(clock); self.layout.addLayout(transport)
         group["timeline"]=timeline; group["clock"]=clock; group["play_button"]=audition
-        self.mixer.positionChanged.connect(lambda ms,r=row:self._position(r,ms)); self.mixer.durationChanged.connect(lambda ms,r=row:self._duration(r,ms)); self.mixer.playingChanged.connect(lambda playing,r=row:self._playing(r,playing))
         for stem,file in outputs:
             line=QHBoxLayout(); name=QLabel("●  "+stem.title()); name.setObjectName("accent"); name.setMinimumWidth(90); solo=QCheckBox("S"); solo.setToolTip("Solo"); mute=QCheckBox("M"); mute.setToolTip("Mute"); volume=QSlider(Qt.Orientation.Horizontal); volume.setRange(-24,6); volume.setValue(0); volume.setFixedWidth(75); volume.setToolTip("Stem audition gain (dB)"); wave=WaveformWidget(); wave.allowDrumRefine=(stem.lower()=="drums"); self.waveforms[file]=wave; group.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=stem,f=file:self._expand_wave(r,s,f)); wave.refineDrumsRequested.connect(lambda r=row,s=stem,f=file:self.drumRefineRequested.emit(r,f,self.groups[r]["folder"]))
             solo.toggled.connect(lambda v,r=row,s=stem:self._state(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=stem:self._state(r,s,"mute",v)); volume.valueChanged.connect(lambda v,r=row,s=stem:self._state(r,s,"db",float(v)))
@@ -51,7 +51,8 @@ class StemResults(QFrame):
         while layout.count():
             item=layout.takeAt(0)
             if item.widget():item.widget().deleteLater()
-        g["drum_substems"]=list(outputs)
+        g["drum_substems"]=list(outputs); g["drum_state"]={stem:{"mute":False,"solo":False,"db":0.0} for stem,_ in outputs}
+        audition=QPushButton("▶ Audition Drum Stems"); audition.setObjectName("primary"); audition.clicked.connect(lambda checked=False,r=row:self._toggle_drum_mix(r)); layout.addWidget(audition); g["drum_play_button"]=audition
         for stem,file in outputs:
             key="drum:"+stem
             line=QHBoxLayout(); name=QLabel("↳  "+stem.title()); name.setObjectName("muted"); name.setMinimumWidth(90); solo=QCheckBox("S"); mute=QCheckBox("M"); gain=QSlider(Qt.Orientation.Horizontal); gain.setRange(-24,6); gain.setValue(0); gain.setFixedWidth(75); wave=WaveformWidget()
