@@ -103,7 +103,7 @@ class StudioController:
                             result=save_func(output,data,"PCM_24",encoder="sndfile")
                             if result is not None:raise RuntimeError(str(result))
                             outputs.append((display,str(output)))
-                        self.window.resultsReady.emit(subrow,str(out_dir),outputs)
+                        self.window.drumSubstemsReady.emit(parent_row,outputs)
                         self.window.statusChanged.emit("DrumSep complete • Kick / Snare / Cymbals / Toms")
                         finish_callback(shared.FileStatus.Finished,item)
                     except Exception as exc:
