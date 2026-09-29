@@ -1,7 +1,7 @@
 import os,sys,subprocess
 from pathlib import Path
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QCheckBox,QFileDialog,QFrame,QHBoxLayout,QLabel,QPushButton,QSlider,QVBoxLayout,QStyle
+from PySide6.QtWidgets import QCheckBox,QDialog,QFileDialog,QFrame,QHBoxLayout,QLabel,QPushButton,QSlider,QVBoxLayout,QStyle
 from ui.waveform import WaveformLoader,WaveformWidget
 from ui.audition import AuditionMixer
 
@@ -19,7 +19,7 @@ class SeekSlider(QSlider):
 
 class StemResults(QFrame):
     def __init__(self,parent=None):
-        super().__init__(parent); self.setObjectName("panel"); self.groups={}; self.waveforms={}; self.loader=WaveformLoader(self); self.loader.ready.connect(self._wave_ready); self.mixer=AuditionMixer(self); self.active_row=None; self.transport_slider=None; self.time_label=None; self.play_button=None
+        super().__init__(parent); self.setObjectName("panel"); self.groups={}; self.waveforms={}; self.loader=WaveformLoader(self); self.loader.ready.connect(self._wave_ready); self.mixer=AuditionMixer(self); self.active_row=None; self.transport_slider=None; self.time_label=None; self.play_button=None; self.expanded=[]
         self.layout=QVBoxLayout(self); title=QLabel("♫  RESULTS"); title.setObjectName("section"); self.layout.addWidget(title); self.hint=QLabel("Completed stems will appear here."); self.hint.setObjectName("muted"); self.layout.addWidget(self.hint)
     def show_results(self,row,folder,outputs):
         self.hint.hide(); divider=QFrame(); divider.setFrameShape(QFrame.Shape.HLine); self.layout.addWidget(divider); group={"folder":folder,"stems":list(outputs),"state":{stem:{"mute":False,"solo":False,"db":0.0} for stem,_ in outputs}}; self.groups[row]=group
@@ -28,9 +28,21 @@ class StemResults(QFrame):
         group["timeline"]=timeline; group["clock"]=clock; group["play_button"]=audition
         self.mixer.positionChanged.connect(lambda ms,r=row:self._position(r,ms)); self.mixer.durationChanged.connect(lambda ms,r=row:self._duration(r,ms)); self.mixer.playingChanged.connect(lambda playing,r=row:self._playing(r,playing))
         for stem,file in outputs:
-            line=QHBoxLayout(); name=QLabel("●  "+stem.title()); name.setObjectName("accent"); name.setMinimumWidth(90); solo=QCheckBox("S"); solo.setToolTip("Solo"); mute=QCheckBox("M"); mute.setToolTip("Mute"); volume=QSlider(Qt.Orientation.Horizontal); volume.setRange(-24,6); volume.setValue(0); volume.setFixedWidth(75); volume.setToolTip("Stem audition gain (dB)"); wave=WaveformWidget(); self.waveforms[file]=wave; group.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._wave_seek(r,fraction))
+            line=QHBoxLayout(); name=QLabel("●  "+stem.title()); name.setObjectName("accent"); name.setMinimumWidth(90); solo=QCheckBox("S"); solo.setToolTip("Solo"); mute=QCheckBox("M"); mute.setToolTip("Mute"); volume=QSlider(Qt.Orientation.Horizontal); volume.setRange(-24,6); volume.setValue(0); volume.setFixedWidth(75); volume.setToolTip("Stem audition gain (dB)"); wave=WaveformWidget(); self.waveforms[file]=wave; group.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=stem,f=file:self._expand_wave(r,s,f))
             solo.toggled.connect(lambda v,r=row,s=stem:self._state(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=stem:self._state(r,s,"mute",v)); volume.valueChanged.connect(lambda v,r=row,s=stem:self._state(r,s,"db",float(v)))
-            line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(volume); line.addWidget(wave,1); self.layout.addLayout(line); self.loader.request(file)
+            group.setdefault("controls",{})[stem]={"solo":solo,"mute":mute,"volume":volume}; line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(volume); line.addWidget(wave,1); self.layout.addLayout(line); self.loader.request(file)
+    def _expand_wave(self,row,stem,file):
+        g=self.groups[row]; dlg=QDialog(self); dlg.setWindowTitle(f"{stem.title()} • Expanded Waveform"); dlg.resize(900,300); dlg.setMinimumSize(560,220)
+        v=QVBoxLayout(dlg); top=QHBoxLayout(); title=QLabel(stem.upper()); title.setObjectName("section"); clock=QLabel(g["clock"].text()); clock.setObjectName("muted"); top.addWidget(title); top.addStretch(); top.addWidget(clock); v.addLayout(top)
+        wave=WaveformWidget(); wave.setMinimumHeight(130); wave.setMaximumHeight(16777215); wave.setFixedHeight(130); wave.setSizePolicy(wave.sizePolicy().horizontalPolicy(),wave.sizePolicy().Policy.Expanding)
+        src=self.waveforms.get(file)
+        if src is not None: wave.set_peaks(src.peaks); wave.set_progress(src.progress)
+        wave.seekRequested.connect(lambda fraction,r=row:self._wave_seek(r,fraction)); v.addWidget(wave,1)
+        controls=QHBoxLayout(); solo=QCheckBox("Solo"); mute=QCheckBox("Mute"); gain=QSlider(Qt.Orientation.Horizontal); gain.setRange(-24,6); gain.setMinimumWidth(240); play=QPushButton("Play / Pause"); stop=QPushButton("Stop")
+        original=g["controls"][stem]; solo.setChecked(original["solo"].isChecked()); mute.setChecked(original["mute"].isChecked()); gain.setValue(original["volume"].value())
+        solo.toggled.connect(original["solo"].setChecked); mute.toggled.connect(original["mute"].setChecked); gain.valueChanged.connect(original["volume"].setValue); play.clicked.connect(lambda:self._toggle_mix(row)); stop.clicked.connect(self.mixer.stop)
+        controls.addWidget(solo); controls.addWidget(mute); controls.addWidget(QLabel("Gain")); controls.addWidget(gain,1); controls.addWidget(play); controls.addWidget(stop); v.addLayout(controls)
+        entry={"dialog":dlg,"wave":wave,"clock":clock,"row":row}; self.expanded.append(entry); dlg.finished.connect(lambda _=0,e=entry:self.expanded.remove(e) if e in self.expanded else None); dlg.show()
     def _state(self,row,stem,key,value):
         self.groups[row]["state"][stem][key]=value
         if row==self.active_row:self.mixer.apply_state()
@@ -62,6 +74,9 @@ class StemResults(QFrame):
             progress=float(ms)/g["timeline"].maximum()
             for wave in g.get("waves",[]):wave.set_progress(progress)
         if g:g["clock"].setText(f"{self._fmt(ms)} / {self._fmt(g['timeline'].maximum())}")
+        for e in self.expanded:
+            if e["row"]==row:
+                e["wave"].set_progress(float(ms)/g["timeline"].maximum() if g and g["timeline"].maximum()>0 else 0); e["clock"].setText(g["clock"].text())
     def _duration(self,row,ms):
         if row!=self.active_row:return
         g=self.groups.get(row)
