@@ -1,5 +1,5 @@
 """Backend adapter for the modern Demucs Studio UI."""
-import pathlib, threading, hashlib, urllib.request
+import pathlib, threading, hashlib, urllib.request, gc
 import separator, shared
 from ui import library_store
 
@@ -90,9 +90,18 @@ class StudioController:
                     if self._sha256(tmp)!=expected:
                         tmp.unlink(missing_ok=True); raise RuntimeError("Downloaded DrumSep checkpoint failed SHA-256 verification.")
                     tmp.replace(checkpoint)
+                self.window.statusChanged.emit("Preparing GPU for DrumSep…")
+                # The full-song Demucs model is no longer needed for this second-stage job.
+                # Drop it before loading DrumSep so both models do not occupy VRAM together.
+                self.engine=None
+                if hasattr(self,"_drum_engine"): self._drum_engine=None
+                gc.collect(); separator.empty_cache()
                 self.window.statusChanged.emit("Loading DrumSep • Kick / Snare / Cymbals / Toms")
                 engine=separator.DemucsSeparator(); engine.loadModel("49469ca8",repo=repo); self._drum_engine=engine
-                default=min(float(getattr(engine,"default_segment",7.8)),float(getattr(engine,"max_segment",7.8)))
+                model_default=min(float(getattr(engine,"default_segment",7.8)),float(getattr(engine,"max_segment",7.8)))
+                # DrumSep is substantially heavier than the normal 4-stem audition path.
+                # A shorter segment trades some speed for much lower peak VRAM usage.
+                default=min(model_default,4.0) if str(self.device).lower()!="cpu" else model_default
                 out_dir=pathlib.Path(parent_folder)/"drums"
                 subrow=-(abs(hash((str(parent_folder),str(drum_file),"drumsep")))%9000000+1000000)
                 def save_cb(file,origin,tensor,tags,save_func,item,finish_callback):
@@ -109,8 +118,9 @@ class StudioController:
                     except Exception as exc:
                         self.window.errorRaised.emit("Failed to save DrumSep stems",str(exc)); finish_callback(shared.FileStatus.Failed,item)
                 def finished(status,item):
-                    self.busy=False; self.window.busyChanged.emit(False); separator.empty_cache()
-                    if status!=shared.FileStatus.Finished:self.window.errorRaised.emit("DrumSep failed","The drum sub-separation did not complete. Check the terminal/log for details.")
+                    self._drum_engine=None; gc.collect(); separator.empty_cache()
+                    self.busy=False; self.window.busyChanged.emit(False)
+                    if status!=shared.FileStatus.Finished:self.window.errorRaised.emit("DrumSep failed","The drum sub-separation did not complete. If CUDA ran out of memory, close other GPU-heavy apps or use CPU for DrumSep.")
                 engine.startSeparate(pathlib.Path(drum_file),subrow,0.0,default,0.25,1,self.device,save_cb,self.window.modelProgress.emit,lambda v,i:None,lambda s,i:None,finished)
             except Exception as exc:
                 self.busy=False; self.window.busyChanged.emit(False); self.window.errorRaised.emit("Unable to refine drums",str(exc))
