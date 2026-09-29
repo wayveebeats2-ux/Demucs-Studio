@@ -1,7 +1,7 @@
 """Demucs Studio visual system — dark production UI with violet accents."""
 DARK_STYLESHEET=r"""
 QMainWindow,QWidget { background:#0b0f16; color:#edf0f7; font-family:"Segoe UI","Inter",sans-serif; font-size:13px; }
-QFrame#header,QFrame#panel,QFrame#dropZone,QFrame#deviceCard { background:#121824; border:1px solid #263044; border-radius:12px; }
+QFrame#panel,QFrame#dropZone,QFrame#deviceCard { background:#121824; border:1px solid #263044; border-radius:12px; }\nQFrame#header { background:transparent; border:none; }
 QFrame#dropZone { background:#111724; border:1px dashed #7557d9; }
 QFrame#dropZone[dragActive="true"] { border:2px solid #9b6cff; background:#18152b; }
 QLabel#brand { font-size:27px; font-weight:800; letter-spacing:2px; color:#f6f7fb; }
