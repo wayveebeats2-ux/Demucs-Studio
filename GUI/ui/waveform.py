@@ -33,7 +33,7 @@ class WaveformWidget(QWidget):
     seekRequested=Signal(float)
     expandRequested=Signal()
     refineDrumsRequested=Signal()
-    def __init__(self,parent=None): super().__init__(parent); self.peaks=None; self.progress=0.0; self.allowDrumRefine=False; self.setMinimumWidth(150); self.setFixedHeight(38); self.setCursor(Qt.CursorShape.PointingHandCursor)
+    def __init__(self,parent=None): super().__init__(parent); self.peaks=None; self.progress=0.0; self.allowDrumRefine=False; self.drumRefineCompleted=False; self.setMinimumWidth(150); self.setFixedHeight(38); self.setCursor(Qt.CursorShape.PointingHandCursor)
     def set_peaks(self,peaks): self.peaks=peaks; self.update()
     def set_progress(self,value): self.progress=max(0.0,min(1.0,float(value))); self.update()
     def mousePressEvent(self,event):
@@ -45,8 +45,8 @@ class WaveformWidget(QWidget):
     def contextMenuEvent(self,event):
         from PySide6.QtWidgets import QMenu
         menu=QMenu(self); expand=menu.addAction("Expand Waveform"); refine=None
-        if self.allowDrumRefine:
-            menu.addSeparator(); refine=menu.addAction("Separate Drums Further…")
+        if self.allowDrumRefine or self.drumRefineCompleted:
+            menu.addSeparator(); refine=menu.addAction("Separate Drums Further…"); refine.setEnabled(not self.drumRefineCompleted)
         chosen=menu.exec(event.globalPos())
         if chosen==expand:self.expandRequested.emit()
         elif refine is not None and chosen==refine:self.refineDrumsRequested.emit()
