@@ -1,7 +1,7 @@
 from pathlib import Path
 from PySide6.QtCore import Qt,Signal,QSize
 from PySide6.QtGui import QIcon,QPixmap
-from PySide6.QtWidgets import (QComboBox,QDoubleSpinBox,QFileDialog,QFrame,QHBoxLayout,QLabel,QListWidget,QMainWindow,QMessageBox,QProgressBar,QPushButton,QSpinBox,QVBoxLayout,QWidget,QStackedWidget,QCheckBox)
+from PySide6.QtWidgets import (QComboBox,QDoubleSpinBox,QFileDialog,QFrame,QHBoxLayout,QLabel,QListWidget,QMainWindow,QMessageBox,QProgressBar,QPushButton,QSpinBox,QVBoxLayout,QWidget,QStackedWidget,QCheckBox,QScrollArea)
 from ui.drop_zone import DropZone
 from ui.stem_results import StemResults
 from ui.media_info import MediaInfoLoader
@@ -24,7 +24,7 @@ class StudioWindow(QMainWindow):
         a.addWidget(outbtn)
         self.advanced.hide(); work.addWidget(self.advanced)
         self._restore_settings()
-        body=QHBoxLayout(); queue_panel=QFrame(); queue_panel.setObjectName("panel"); q=QVBoxLayout(queue_panel); title=QLabel("TRACK QUEUE"); title.setObjectName("section"); q.addWidget(title); self.queue=QListWidget(); q.addWidget(self.queue,1); self.progress=QProgressBar(); self.progress.setRange(0,100); q.addWidget(self.progress); body.addWidget(queue_panel,3); self.results=StemResults(); body.addWidget(self.results,2); work.addLayout(body,1); self.library=LibraryView(); self.library.openSession.connect(self._open_library)
+        body=QHBoxLayout(); queue_panel=QFrame(); queue_panel.setObjectName("panel"); q=QVBoxLayout(queue_panel); title=QLabel("TRACK QUEUE"); title.setObjectName("section"); q.addWidget(title); self.queue=QListWidget(); q.addWidget(self.queue,1); self.progress=QProgressBar(); self.progress.setRange(0,100); q.addWidget(self.progress); body.addWidget(queue_panel,3); self.results=StemResults(); self.results.setSizePolicy(self.results.sizePolicy().horizontalPolicy(),self.results.sizePolicy().Policy.Maximum); results_scroll=QScrollArea(); results_scroll.setWidgetResizable(True); results_scroll.setFrameShape(QFrame.Shape.NoFrame); results_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff); results_scroll.setWidget(self.results); results_scroll.setObjectName("resultsScroll"); body.addWidget(results_scroll,2); work.addLayout(body,1); self.library=LibraryView(); self.library.openSession.connect(self._open_library)
         self.settings_page=QWidget(); sv=QVBoxLayout(self.settings_page); sv.setContentsMargins(0,0,0,0); sv.setSpacing(14)
         settings_panel=QFrame(); settings_panel.setObjectName("panel"); sp=QVBoxLayout(settings_panel); st=QLabel("⚙  SETTINGS"); st.setObjectName("section"); sp.addWidget(st)
         info=QLabel("Studio defaults are saved automatically and used for future separations."); info.setObjectName("muted"); sp.addWidget(info)
