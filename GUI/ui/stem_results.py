@@ -69,7 +69,7 @@ class StemResults(QFrame):
         if self.active_drum_row==row and self.drum_mixer.players:
             self.drum_mixer.play_pause(); return
         self.mixer.pause(); self.active_drum_row=row
-        self.drum_mixer.load(("drums",row),g.get("drum_substems",[]),g.get("drum_state",{})); self.drum_mixer.play()
+        self.drum_mixer.load(int(abs(row)+10000000),g.get("drum_substems",[]),g.get("drum_state",{})); self.drum_mixer.play()
 
     def _drum_wave_seek(self,row,fraction):
         if row!=self.active_drum_row:return
