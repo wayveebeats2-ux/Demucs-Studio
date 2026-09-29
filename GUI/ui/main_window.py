@@ -15,7 +15,7 @@ class StudioWindow(QMainWindow):
     def _build(self):
         root=QWidget(); o=QVBoxLayout(root); o.setContentsMargins(22,22,22,22); o.setSpacing(14)
         header=QFrame(); header.setObjectName("header"); h=QHBoxLayout(header); brandbox=QVBoxLayout(); brand=QLabel("DEMUCS  STUDIO"); brand.setObjectName("brand"); subtitle=QLabel("AI POWERED STEM SEPARATION"); subtitle.setObjectName("subtitle"); brandbox.addWidget(brand); brandbox.addWidget(subtitle); self.device=QLabel("●  Starting backend…"); self.device.setObjectName("accent"); h.addLayout(brandbox); h.addStretch(); deviceCard=QFrame(); deviceCard.setObjectName("deviceCard"); dh=QHBoxLayout(deviceCard); dh.setContentsMargins(14,8,14,8); dh.addWidget(self.device); h.addWidget(deviceCard); o.addWidget(header)
-        self.drop=DropZone(); self.drop.filesDropped.connect(self.add_files); o.addWidget(self.drop)
+        self.drop=DropZone(); self.drop.filesDropped.connect(self.add_files); self.drop.clicked.connect(self.pick_files); o.addWidget(self.drop)
         controls=QFrame(); controls.setObjectName("panel"); cv=QVBoxLayout(controls); labels=QHBoxLayout(); pLabel=QLabel("1. CHOOSE PRESET"); pLabel.setObjectName("section"); mLabel=QLabel("2. SELECT MODEL"); mLabel.setObjectName("section"); labels.addWidget(pLabel,2); labels.addWidget(mLabel,2); labels.addStretch(4); cv.addLayout(labels); c=QHBoxLayout(); cv.addLayout(c); self.preset=QComboBox(); self.preset.addItem("4 Stem • Vocals / Drums / Bass / Other","four"); self.preset.addItem("Vocals + Instrumental • 2 Stem","vocals"); self.preset.addItem("6 Stem","six"); self.preset.currentIndexChanged.connect(self._preset_changed); self.model=QComboBox(); self.model.addItem("htdemucs • Recommended","htdemucs"); self.model.addItem("htdemucs_ft • Higher quality","htdemucs_ft"); self.model.addItem("htdemucs_6s • 6 stem","htdemucs_6s"); add=QPushButton("Add Tracks"); add.clicked.connect(self.pick_files); addfolder=QPushButton("Add Folder"); addfolder.clicked.connect(self.pick_folder); remove=QPushButton("Remove"); remove.clicked.connect(self.remove_selected); clear=QPushButton("Clear All"); clear.setObjectName("danger"); clear.clicked.connect(self.clear_queue); adv=QPushButton("Advanced"); adv.clicked.connect(self._toggle_advanced); self.separate=QPushButton("SEPARATE"); self.separate.setObjectName("primary"); self.separate.setEnabled(False); self.separate.clicked.connect(self.start); c.addWidget(self.preset,2); c.addWidget(self.model,2); c.addWidget(add); c.addWidget(addfolder); c.addWidget(remove); c.addWidget(clear); c.addWidget(adv); c.addWidget(self.separate); o.addWidget(controls)
         self.advanced=QFrame(); self.advanced.setObjectName("panel"); a=QHBoxLayout(self.advanced); self.segment=QDoubleSpinBox(); self.segment.setRange(.1,3600); self.segment.setValue(7.8); self.segment.setSuffix(" s"); self.overlap=QDoubleSpinBox(); self.overlap.setRange(0,.99); self.overlap.setSingleStep(.05); self.overlap.setValue(.25); self.shifts=QSpinBox(); self.shifts.setRange(1,20); self.shifts.setValue(1); self.gain=QDoubleSpinBox(); self.gain.setRange(-24,24); self.gain.setSuffix(" dB"); self.depth=QComboBox(); self.depth.addItem("24-bit WAV","PCM_24"); self.depth.addItem("16-bit WAV","PCM_16"); self.depth.addItem("32-bit float WAV","FLOAT"); self.output_dir=""; self.collision=QComboBox(); self.collision.addItem("Rename existing","rename"); self.collision.addItem("Overwrite existing","overwrite"); self.collision.addItem("Skip existing","skip"); outbtn=QPushButton("Output Folder"); outbtn.clicked.connect(self.pick_output);
         for label,w in [("Segment",self.segment),("Overlap",self.overlap),("Shifts",self.shifts),("Input gain",self.gain),("Output",self.depth),("Existing",self.collision)]:a.addWidget(QLabel(label));a.addWidget(w)
@@ -36,10 +36,19 @@ class StudioWindow(QMainWindow):
         folder=QFileDialog.getExistingDirectory(self,"Choose output folder",self.output_dir or str(Path.home()))
         if folder:self.output_dir=folder;self.status.setText("Output: "+folder)
     def add_files(self,files):
+        exts={".wav",".flac",".mp3",".m4a",".aac",".ogg",".opus",".wma",".aiff",".aif"}
+        expanded=[]
+        for raw in files:
+            p=Path(raw)
+            if p.is_dir(): expanded.extend(str(x) for x in p.rglob("*") if x.is_file() and x.suffix.lower() in exts)
+            elif p.is_file() and p.suffix.lower() in exts: expanded.append(str(p))
         existing={self.queue.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.queue.count())}
-        for file in files:
+        added=0
+        for file in expanded:
             if file not in existing:
-                self.queue.addItem("◌  "+Path(file).name+"\\n    Reading metadata…"); item=self.queue.item(self.queue.count()-1); item.setData(Qt.ItemDataRole.UserRole,file); item.setSizeHint(QSize(0,58)); existing.add(file); self.media.request(file)
+                self.queue.addItem("◌  "+Path(file).name+"\n    Reading metadata…"); item=self.queue.item(self.queue.count()-1); item.setData(Qt.ItemDataRole.UserRole,file); item.setSizeHint(QSize(0,58)); existing.add(file); self.media.request(file); added+=1
+        if files and not added and not any(str(x) in existing for x in expanded):
+            QMessageBox.warning(self,"No audio added","No supported audio files were found.")
         self._refresh_enabled()
     @staticmethod
     def _duration(seconds):
