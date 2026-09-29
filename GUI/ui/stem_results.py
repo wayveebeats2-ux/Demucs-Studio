@@ -54,14 +54,14 @@ class StemResults(QFrame):
             if stem.lower()!="drums": name_layout.addWidget(name); name_layout.addStretch()
             name_box.setMinimumWidth(118); line.addWidget(name_box); line.addWidget(solo); line.addWidget(mute); line.addWidget(volume); line.addWidget(wave,1); self._layout_widget(line)
             if stem.lower()=="drums":
-                children=QWidget(); child_layout=QVBoxLayout(children); child_layout.setContentsMargins(34,6,0,8); child_layout.setSpacing(3); children.hide(); group["drum_children_widget"]=children; group["drum_children_layout"]=child_layout; self._add_result_widget(children)
+                children=QWidget(); children.setSizePolicy(children.sizePolicy().horizontalPolicy(),children.sizePolicy().Policy.Fixed); child_layout=QVBoxLayout(children); child_layout.setContentsMargins(34,6,0,8); child_layout.setSpacing(3); children.setFixedHeight(0); children.hide(); group["drum_children_widget"]=children; group["drum_children_layout"]=child_layout; self._add_result_widget(children)
                 existing_dir=Path(folder)/"drums"; existing=[(n,str(existing_dir/f"{n}.wav")) for n in ("kick","snare","cymbals","toms") if (existing_dir/f"{n}.wav").exists()]
                 if existing:self.add_drum_substems(row,existing)
             self.loader.request(file)
     def _toggle_drum_children(self,row):
         g=self.groups.get(row); w=g.get("drum_children_widget") if g else None
         if not w:return
-        show=not w.isVisible(); w.setVisible(show); g["drum_disclosure"].setText("▼" if show else "▶")
+        show=not w.isVisible(); w.setFixedHeight(g.get("drum_children_height",0) if show else 0); w.setVisible(show); g["drum_disclosure"].setText("▼" if show else "▶")
 
     def add_drum_substems(self,row,outputs):
         g=self.groups.get(row)
@@ -78,7 +78,7 @@ class StemResults(QFrame):
             self.waveforms[file]=wave; g.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._drum_wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=key,f=file:self._expand_drum_wave(r,s,f))
             solo.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"mute",v)); gain.valueChanged.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"db",float(v)))
             g.setdefault("controls",{})[key]={"solo":solo,"mute":mute,"volume":gain}; line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(gain); line.addWidget(wave,1); layout.addWidget(row_widget); self.loader.request(file)
-        g["drum_disclosure"].show(); g["drum_children_widget"].show(); g["drum_disclosure"].setText("▼")
+        g["drum_children_height"]=42 + (33*len(outputs)); g["drum_disclosure"].show(); g["drum_children_widget"].setFixedHeight(g["drum_children_height"]); g["drum_children_widget"].show(); g["drum_disclosure"].setText("▼")
 
     def _drum_state(self,row,stem,field,value):
         g=self.groups[row]; g["drum_state"][stem][field]=value
