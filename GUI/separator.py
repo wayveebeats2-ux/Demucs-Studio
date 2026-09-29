@@ -229,6 +229,7 @@ class SeparatorModelBase:
         self,
     ):
         self.separating = False
+        self.cancel_requested = False
         for module in self.required_modules:
             if module not in sys.modules:
                 raise ImportError("Module %s is not imported" % module)
@@ -245,6 +246,7 @@ class SeparatorModelBase:
     def startSeparate(self, *args, **kwargs):
         if self.separating:
             return
+        self.cancel_requested = False
         self.separating = True
         self.separate(*args, **kwargs)
 
@@ -252,7 +254,12 @@ class SeparatorModelBase:
     def separate(self, *args, **kwargs):
         raise NotImplementedError
 
+    def requestCancel(self):
+        self.cancel_requested = True
+
     def updateProgress(self, progress_dict):
+        if self.cancel_requested:
+            raise KeyboardInterrupt
         progress = Fraction(0)
         progress_per_model = Fraction(1, progress_dict["models"])
         progress_per_shift = Fraction(1, max(1, self.shifts))
