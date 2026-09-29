@@ -1,5 +1,5 @@
 """Backend adapter for the modern Demucs Studio UI."""
-import pathlib, threading
+import pathlib, threading, hashlib, urllib.request
 import separator, shared
 from ui import library_store
 
@@ -67,3 +67,58 @@ class StudioController:
         self.window.trackFinished.emit(int(item),int(status))
         if status==shared.FileStatus.Finished: self._index+=1; self._run_next()
         else: self.busy=False; self.window.busyChanged.emit(False)
+
+
+    def refine_drums(self,parent_row,drum_file,parent_folder):
+        if self.busy:
+            self.window.errorRaised.emit("Demucs Studio is busy","Wait for the current separation to finish first."); return
+        self.busy=True; self.window.busyChanged.emit(True)
+        def work():
+            try:
+                repo=pathlib.Path(shared.pretrained)/"drumsep"; repo.mkdir(parents=True,exist_ok=True)
+                checkpoint=repo/"49469ca8.th"
+                expected="aefaa8543c9b9c75e22f5f32b53ab86dfe416457849af1383ff1aef83401423f"
+                url="https://github.com/ZFTurbo/Music-Source-Separation-Training/releases/download/v1.0.5/model_drumsep.th"
+                valid=False
+                if checkpoint.exists():
+                    valid=self._sha256(checkpoint)==expected
+                if not valid:
+                    if checkpoint.exists():checkpoint.unlink()
+                    tmp=checkpoint.with_suffix(".th.download")
+                    self.window.statusChanged.emit("Downloading DrumSep model (first use)…")
+                    urllib.request.urlretrieve(url,tmp)
+                    if self._sha256(tmp)!=expected:
+                        tmp.unlink(missing_ok=True); raise RuntimeError("Downloaded DrumSep checkpoint failed SHA-256 verification.")
+                    tmp.replace(checkpoint)
+                self.window.statusChanged.emit("Loading DrumSep • Kick / Snare / Cymbals / Toms")
+                engine=separator.DemucsSeparator(); engine.loadModel("49469ca8",repo=repo); self._drum_engine=engine
+                default=min(float(getattr(engine,"default_segment",7.8)),float(getattr(engine,"max_segment",7.8)))
+                out_dir=pathlib.Path(parent_folder)/"drums"
+                subrow=-(abs(hash((str(parent_folder),str(drum_file),"drumsep")))%9000000+1000000)
+                def save_cb(file,origin,tensor,tags,save_func,item,finish_callback):
+                    try:
+                        out_dir.mkdir(parents=True,exist_ok=True); outputs=[]; names={"bombo":"kick","redoblante":"snare","platillos":"cymbals","toms":"toms"}
+                        for native,data in tensor.items():
+                            display=names.get(native,native); output=out_dir/f"{display}.wav"
+                            result=save_func(output,data,"PCM_24",encoder="sndfile")
+                            if result is not None:raise RuntimeError(str(result))
+                            outputs.append((display,str(output)))
+                        self.window.resultsReady.emit(subrow,str(out_dir),outputs)
+                        self.window.statusChanged.emit("DrumSep complete • Kick / Snare / Cymbals / Toms")
+                        finish_callback(shared.FileStatus.Finished,item)
+                    except Exception as exc:
+                        self.window.errorRaised.emit("Failed to save DrumSep stems",str(exc)); finish_callback(shared.FileStatus.Failed,item)
+                def finished(status,item):
+                    self.busy=False; self.window.busyChanged.emit(False); separator.empty_cache()
+                    if status!=shared.FileStatus.Finished:self.window.errorRaised.emit("DrumSep failed","The drum sub-separation did not complete. Check the terminal/log for details.")
+                engine.startSeparate(pathlib.Path(drum_file),subrow,0.0,default,0.25,1,self.device,save_cb,self.window.modelProgress.emit,lambda v,i:None,lambda s,i:None,finished)
+            except Exception as exc:
+                self.busy=False; self.window.busyChanged.emit(False); self.window.errorRaised.emit("Unable to refine drums",str(exc))
+        threading.Thread(target=work,daemon=True).start()
+
+    @staticmethod
+    def _sha256(path):
+        h=hashlib.sha256()
+        with open(path,"rb") as f:
+            for block in iter(lambda:f.read(1024*1024),b""):h.update(block)
+        return h.hexdigest()
