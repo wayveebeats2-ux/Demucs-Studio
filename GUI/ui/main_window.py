@@ -1,8 +1,10 @@
 from pathlib import Path
 from PySide6.QtCore import Qt,Signal,QSize
-from PySide6.QtGui import QIcon,QPixmap\nfrom PySide6.QtWidgets import (QComboBox,QDoubleSpinBox,QFileDialog,QFrame,QHBoxLayout,QLabel,QListWidget,QMainWindow,QMessageBox,QProgressBar,QPushButton,QSpinBox,QVBoxLayout,QWidget)
+from PySide6.QtGui import QIcon,QPixmap
+from PySide6.QtWidgets import (QComboBox,QDoubleSpinBox,QFileDialog,QFrame,QHBoxLayout,QLabel,QListWidget,QMainWindow,QMessageBox,QProgressBar,QPushButton,QSpinBox,QVBoxLayout,QWidget)
 from ui.drop_zone import DropZone
-from ui.stem_results import StemResults\nfrom ui.media_info import MediaInfoLoader
+from ui.stem_results import StemResults
+from ui.media_info import MediaInfoLoader
 from ui.theme import DARK_STYLESHEET
 
 class StudioWindow(QMainWindow):
@@ -37,7 +39,8 @@ class StudioWindow(QMainWindow):
         existing={self.queue.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.queue.count())}
         for file in files:
             if file not in existing:
-                self.queue.addItem("◌  "+Path(file).name+"\n    Reading metadata…"); item=self.queue.item(self.queue.count()-1); item.setData(Qt.ItemDataRole.UserRole,file); item.setSizeHint(QSize(0,58)); existing.add(file); self.media.request(file)
+                self.queue.addItem("◌  "+Path(file).name+"
+    Reading metadata…"); item=self.queue.item(self.queue.count()-1); item.setData(Qt.ItemDataRole.UserRole,file); item.setSizeHint(QSize(0,58)); existing.add(file); self.media.request(file)
         self._refresh_enabled()
     @staticmethod
     def _duration(seconds):
@@ -50,7 +53,8 @@ class StudioWindow(QMainWindow):
             item=self.queue.item(i)
             if item.data(Qt.ItemDataRole.UserRole)==path:
                 title=info.get("title") or Path(path).stem; artist=info.get("artist") or "Unknown artist"
-                item.setText(f"♫  {title}\n    {artist}   •   {self._duration(info.get('duration'))}   •   {self._size(info.get('size'))}")
+                item.setText(f"♫  {title}
+    {artist}   •   {self._duration(info.get('duration'))}   •   {self._size(info.get('size'))}")
                 art=info.get("artwork")
                 if art:
                     px=QPixmap(); px.loadFromData(art); item.setIcon(QIcon(px))
