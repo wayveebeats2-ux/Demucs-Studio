@@ -31,7 +31,8 @@ class WaveformLoader(QObject):
 
 class WaveformWidget(QWidget):
     seekRequested=Signal(float)
-    expandRequested=Signal()\n    refineDrumsRequested=Signal()
+    expandRequested=Signal()
+    refineDrumsRequested=Signal()
     def __init__(self,parent=None): super().__init__(parent); self.peaks=None; self.progress=0.0; self.allowDrumRefine=False; self.setMinimumWidth(150); self.setFixedHeight(38); self.setCursor(Qt.CursorShape.PointingHandCursor)
     def set_peaks(self,peaks): self.peaks=peaks; self.update()
     def set_progress(self,value): self.progress=max(0.0,min(1.0,float(value))); self.update()
