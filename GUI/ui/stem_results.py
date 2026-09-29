@@ -29,12 +29,13 @@ class StemResults(QFrame):
         transport=QHBoxLayout(); timeline=SeekSlider(Qt.Orientation.Horizontal); timeline.setRange(0,0); timeline.setTracking(True); clock=QLabel("0:00 / 0:00"); clock.setObjectName("muted"); timeline.sliderMoved.connect(lambda ms,r=row:self._seek(r,ms)); transport.addWidget(timeline,1); transport.addWidget(clock); self.layout.addLayout(transport)
         group["timeline"]=timeline; group["clock"]=clock; group["play_button"]=audition
         for stem,file in outputs:
-            line=QHBoxLayout(); name=QLabel("●  "+stem.title()); name.setObjectName("accent"); name.setMinimumWidth(90); solo=QCheckBox("S"); solo.setToolTip("Solo"); mute=QCheckBox("M"); mute.setToolTip("Mute"); volume=QSlider(Qt.Orientation.Horizontal); volume.setRange(-24,6); volume.setValue(0); volume.setFixedWidth(75); volume.setToolTip("Stem audition gain (dB)"); wave=WaveformWidget(); wave.allowDrumRefine=(stem.lower()=="drums"); self.waveforms[file]=wave; group.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=stem,f=file:self._expand_wave(r,s,f)); wave.refineDrumsRequested.connect(lambda r=row,s=stem,f=file:self.drumRefineRequested.emit(r,f,self.groups[r]["folder"]))
+            line=QHBoxLayout(); name_box=QWidget(); name_layout=QHBoxLayout(name_box); name_layout.setContentsMargins(0,0,0,0); name_layout.setSpacing(4); name=QLabel("●  "+stem.title()); name.setObjectName("accent"); name.setMinimumWidth(0); solo=QCheckBox("S"); solo.setToolTip("Solo"); mute=QCheckBox("M"); mute.setToolTip("Mute"); volume=QSlider(Qt.Orientation.Horizontal); volume.setRange(-24,6); volume.setValue(0); volume.setFixedWidth(75); volume.setToolTip("Stem audition gain (dB)"); wave=WaveformWidget(); wave.allowDrumRefine=(stem.lower()=="drums"); self.waveforms[file]=wave; group.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=stem,f=file:self._expand_wave(r,s,f)); wave.refineDrumsRequested.connect(lambda r=row,s=stem,f=file:self.drumRefineRequested.emit(r,f,self.groups[r]["folder"]))
             solo.toggled.connect(lambda v,r=row,s=stem:self._state(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=stem:self._state(r,s,"mute",v)); volume.valueChanged.connect(lambda v,r=row,s=stem:self._state(r,s,"db",float(v)))
             group.setdefault("controls",{})[stem]={"solo":solo,"mute":mute,"volume":volume}
             if stem.lower()=="drums":
-                disclosure=QPushButton("▸"); disclosure.setFixedWidth(26); disclosure.hide(); disclosure.clicked.connect(lambda checked=False,r=row:self._toggle_drum_children(r)); line.insertWidget(0,disclosure); group["drum_disclosure"]=disclosure
-            line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(volume); line.addWidget(wave,1); self.layout.addLayout(line)
+                disclosure=QPushButton("▶"); disclosure.setFlat(True); disclosure.setFixedSize(22,22); disclosure.setCursor(Qt.CursorShape.PointingHandCursor); disclosure.setStyleSheet("QPushButton { border: none; background: transparent; padding: 0; font-size: 11px; } QPushButton:hover { color: #b995ff; }"); disclosure.hide(); disclosure.clicked.connect(lambda checked=False,r=row:self._toggle_drum_children(r)); name_layout.addWidget(name); name_layout.addWidget(disclosure); name_layout.addStretch(); group["drum_disclosure"]=disclosure
+            if stem.lower()!="drums": name_layout.addWidget(name); name_layout.addStretch()
+            name_box.setMinimumWidth(118); line.addWidget(name_box); line.addWidget(solo); line.addWidget(mute); line.addWidget(volume); line.addWidget(wave,1); self.layout.addLayout(line)
             if stem.lower()=="drums":
                 children=QWidget(); child_layout=QVBoxLayout(children); child_layout.setContentsMargins(34,6,0,8); child_layout.setSpacing(3); children.hide(); group["drum_children_widget"]=children; group["drum_children_layout"]=child_layout; self.layout.addWidget(children)
                 existing_dir=Path(folder)/"drums"; existing=[(n,str(existing_dir/f"{n}.wav")) for n in ("kick","snare","cymbals","toms") if (existing_dir/f"{n}.wav").exists()]
@@ -43,7 +44,7 @@ class StemResults(QFrame):
     def _toggle_drum_children(self,row):
         g=self.groups.get(row); w=g.get("drum_children_widget") if g else None
         if not w:return
-        show=not w.isVisible(); w.setVisible(show); g["drum_disclosure"].setText("▾" if show else "▸")
+        show=not w.isVisible(); w.setVisible(show); g["drum_disclosure"].setText("▼" if show else "▶")
 
     def add_drum_substems(self,row,outputs):
         g=self.groups.get(row)
@@ -60,7 +61,7 @@ class StemResults(QFrame):
             self.waveforms[file]=wave; g.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._drum_wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=key,f=file:self._expand_drum_wave(r,s,f))
             solo.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"mute",v)); gain.valueChanged.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"db",float(v)))
             g.setdefault("controls",{})[key]={"solo":solo,"mute":mute,"volume":gain}; line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(gain); line.addWidget(wave,1); layout.addWidget(row_widget); self.loader.request(file)
-        g["drum_disclosure"].show(); g["drum_children_widget"].show(); g["drum_disclosure"].setText("▾")
+        g["drum_disclosure"].show(); g["drum_children_widget"].show(); g["drum_disclosure"].setText("▼")
 
     def _drum_state(self,row,stem,field,value):
         g=self.groups[row]; g["drum_state"][stem][field]=value
