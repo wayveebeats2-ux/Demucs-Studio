@@ -1,6 +1,7 @@
 """Backend adapter for the modern Demucs Studio UI."""
 import pathlib, threading
 import separator, shared
+from ui import library_store
 
 class StudioController:
     def __init__(self, window):
@@ -54,7 +55,12 @@ class StudioController:
                 result=save_func(output,data,subtype,encoder="sndfile")
                 if result is not None: raise RuntimeError(str(result))
                 outputs.append((stem,str(output)))
-            self.window.resultsReady.emit(int(item),str(out_dir),outputs); finish_callback(shared.FileStatus.Finished,item)
+            metadata={}
+            try:
+                qitem=self.window.queue.item(int(item)); metadata=qitem.data(257) or {}
+            except Exception: pass
+            library_store.add(str(file),str(out_dir),self.engine.model,self.options.get("preset","four"),outputs,metadata)
+            self.window.resultsReady.emit(int(item),str(out_dir),outputs); self.window.libraryChanged.emit(); finish_callback(shared.FileStatus.Finished,item)
         except Exception as exc:
             self.window.errorRaised.emit("Failed to save stems",str(exc)); finish_callback(shared.FileStatus.Failed,item)
     def _finished(self,status,item):
