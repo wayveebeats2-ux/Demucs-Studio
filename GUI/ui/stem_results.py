@@ -27,7 +27,11 @@ class StemResults(QFrame):
     def _wave_seek(self,row,fraction):
         if row!=self.active_row:return
         g=self.groups[row]; duration=g["timeline"].maximum()
-        if duration>0:self.mixer.seek(int(duration*max(0.0,min(1.0,fraction))))
+        if duration>0:
+            fraction=max(0.0,min(1.0,fraction)); target=int(duration*fraction)
+            g["timeline"].setValue(target); g["clock"].setText(f"{self._fmt(target)} / {self._fmt(duration)}")
+            for wave in g.get("waves",[]):wave.set_progress(fraction)
+            self.mixer.seek(target)
     def _toggle_mix(self,row):
         if self.active_row==row and self.mixer.players:
             self.mixer.play_pause(); return
