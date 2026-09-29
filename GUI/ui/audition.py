@@ -8,7 +8,7 @@ from PySide6.QtMultimedia import QAudioOutput,QMediaPlayer
 class AuditionMixer(QObject):
     ready=Signal(int); failed=Signal(int,str); positionChanged=Signal("qlonglong"); durationChanged=Signal("qlonglong"); playingChanged=Signal(bool)
     def __init__(self,parent=None):
-        super().__init__(parent); self.players={}; self.outputs={}; self.stems=[]; self.state={}; self.key=None; self._duration=0; self._syncing=False
+        super().__init__(parent); self.players={}; self.outputs={}; self.stems=[]; self.state={}; self.key=None; self._duration=0; self._syncing=False; self._target_position=0
         self._clock=QTimer(self); self._clock.setInterval(80); self._clock.timeout.connect(self._tick)
     def load(self,key,stems,state):
         self.stop(); self._dispose(); self.key=key; self.stems=list(stems); self.state=state
@@ -51,9 +51,18 @@ class AuditionMixer(QObject):
         for p in self.players.values():p.stop();p.setPosition(0)
         self._clock.stop();self.positionChanged.emit(0);self.playingChanged.emit(False)
     def seek(self,ms):
-        ms=max(0,min(int(ms),self._duration))
-        for p in self.players.values():p.setPosition(ms)
+        ms=max(0,min(int(ms),self._duration)); self._target_position=ms
+        was_playing=any(p.playbackState()==QMediaPlayer.PlaybackState.PlayingState for p in self.players.values())
+        for p in self.players.values():
+            p.setPosition(ms)
+            if was_playing and p.playbackState()!=QMediaPlayer.PlaybackState.PlayingState:p.play()
         self.positionChanged.emit(ms)
+        QTimer.singleShot(35,lambda target=ms:self._confirm_seek(target))
+    def _confirm_seek(self,target):
+        if target!=self._target_position:return
+        for p in self.players.values():
+            if abs(p.position()-target)>250:p.setPosition(target)
+        self.positionChanged.emit(target)
     def position(self):
         if not self.players:return 0
         vals=[p.position() for p in self.players.values()]
