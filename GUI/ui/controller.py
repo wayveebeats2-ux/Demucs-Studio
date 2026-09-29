@@ -1,11 +1,11 @@
 """Backend adapter for the modern Demucs Studio UI."""
-import pathlib, threading, hashlib, urllib.request, gc
+import pathlib, threading, hashlib, urllib.request, gc, sys, platform, shutil
 import separator, shared
 from ui import library_store
 
 class StudioController:
     def __init__(self, window):
-        self.window=window; self.engine=None; self.device="cpu"; self.busy=False; self.options={}
+        self.window=window; self.engine=None; self.device="cpu"; self.busy=False; self.options={}; self.cancelled=False
         separator.setUpdateStatusFunc(window.statusChanged.emit)
     def initialize(self):
         def ready(_paused=0,error=""):
@@ -19,7 +19,7 @@ class StudioController:
         separator.starter(self.window.statusChanged.emit,ready)
     def load_model_and_start(self,model,files,options=None):
         if self.busy or not files:return
-        self.options=options or {}; self.busy=True; self.window.busyChanged.emit(True)
+        self.options=options or {}; self.cancelled=False; self.busy=True; self.window.busyChanged.emit(True)
         def work():
             try:
                 self.engine=separator.DemucsSeparator(); models,_,_=self.engine.listModels()
@@ -29,7 +29,26 @@ class StudioController:
             except Exception as exc:
                 self.busy=False; self.window.busyChanged.emit(False); self.window.errorRaised.emit("Unable to start separation",str(exc))
         threading.Thread(target=work,daemon=True).start()
+    def cancel(self):
+        if not self.busy:return
+        self.cancelled=True
+        self.window.statusChanged.emit("Cancelling separation…")
+        for engine in (self.engine,getattr(self,"_drum_engine",None)):
+            if engine is not None and hasattr(engine,"requestCancel"): engine.requestCancel()
+
+    def diagnostics(self):
+        info={"Python":sys.version.split()[0],"Platform":platform.platform(),"Device":self.device,"FFmpeg":shutil.which("ffmpeg") or "Not found","Model cache":str(getattr(shared,"model_cache","—")),"Config":str(getattr(shared,"config_path",getattr(shared,"homeDir","—")))}
+        try:
+            import torch
+            info["PyTorch"]=torch.__version__; info["CUDA available"]=str(torch.cuda.is_available())
+            if torch.cuda.is_available():
+                p=torch.cuda.get_device_properties(0); info["GPU"]=p.name; info["VRAM"]=f"{p.total_memory/1073741824:.1f} GiB"; info["CUDA"]=str(torch.version.cuda)
+        except Exception as exc: info["PyTorch"]=f"Unavailable: {exc}"
+        return info
+
     def _run_next(self):
+        if self.cancelled:
+            self.busy=False; self.window.busyChanged.emit(False); self.window.statusChanged.emit("Separation cancelled"); separator.empty_cache(); return
         if self._index>=len(self._files):
             self.busy=False; self.window.busyChanged.emit(False); self.window.statusChanged.emit("Separation complete"); self.window.allFinished.emit(); separator.empty_cache(); return
         path=pathlib.Path(self._files[self._index]); row=self._index; self.window.trackStarted.emit(row,path.name)
@@ -65,6 +84,8 @@ class StudioController:
             self.window.errorRaised.emit("Failed to save stems",str(exc)); finish_callback(shared.FileStatus.Failed,item)
     def _finished(self,status,item):
         self.window.trackFinished.emit(int(item),int(status))
+        if self.cancelled or status==shared.FileStatus.Cancelled:
+            self.busy=False; self.window.busyChanged.emit(False); self.window.statusChanged.emit("Separation cancelled"); separator.empty_cache(); return
         if status==shared.FileStatus.Finished: self._index+=1; self._run_next()
         else: self.busy=False; self.window.busyChanged.emit(False)
 
