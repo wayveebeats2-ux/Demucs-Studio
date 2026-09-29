@@ -34,7 +34,7 @@ class _MixTask(QRunnable):
         except Exception as exc:self.signals.failed.emit(self.key,str(exc))
 
 class AuditionMixer(QObject):
-    ready=Signal(int); failed=Signal(int,str); positionChanged=Signal(int); durationChanged=Signal(int); playingChanged=Signal(bool)
+    ready=Signal(int); failed=Signal(int,str); positionChanged=Signal("qlonglong"); durationChanged=Signal("qlonglong"); playingChanged=Signal(bool)
     def __init__(self,parent=None):
         super().__init__(parent); self.pool=QThreadPool.globalInstance(); self.audio=QAudioOutput(self); self.player=QMediaPlayer(self); self.player.setAudioOutput(self.audio); self.tasks=[]; self.player.positionChanged.connect(self.positionChanged); self.player.durationChanged.connect(self.durationChanged); self.player.playbackStateChanged.connect(lambda s:self.playingChanged.emit(s==QMediaPlayer.PlaybackState.PlayingState))
     def render_and_play(self,key,stems,state):
