@@ -8,7 +8,7 @@ QLabel#brand { font-size:27px; font-weight:800; letter-spacing:2px; color:#f6f7f
 QLabel#subtitle { color:#a9a1c8; font-size:10px; letter-spacing:2px; }
 QLabel#section { color:#c6b5ff; font-size:13px; font-weight:700; letter-spacing:1px; }
 QLabel#muted { color:#8791a5; }
-QLabel#accent { color:#a77cff; font-weight:700; }
+QLabel#accent { color:#a77cff; font-weight:700; font-size:11px; }
 QLabel#success { color:#55db83; font-weight:600; }
 QPushButton { background:#1a2230; border:1px solid #303b50; border-radius:8px; padding:8px 13px; color:#eef1f8; font-weight:600; }
 QPushButton:hover { background:#242e40; border-color:#6955aa; }
