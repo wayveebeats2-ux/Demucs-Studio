@@ -61,7 +61,7 @@ class StudioWindow(QMainWindow):
             item=self.queue.item(i)
             if item.data(Qt.ItemDataRole.UserRole)==path:
                 title=info.get("title") or Path(path).stem; artist=info.get("artist") or "Unknown artist"
-                item.setText(f"♫  {title}\\n    {artist}   •   {self._duration(info.get('duration'))}   •   {self._size(info.get('size'))}")
+                item.setText(f"♫  {title}\n    {artist}   •   {self._duration(info.get('duration'))}   •   {self._size(info.get('size'))}")
                 art=info.get("artwork")
                 if art:
                     px=QPixmap(); px.loadFromData(art); item.setIcon(QIcon(px))
