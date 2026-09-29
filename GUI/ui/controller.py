@@ -101,7 +101,7 @@ class StudioController:
                 model_default=min(float(getattr(engine,"default_segment",7.8)),float(getattr(engine,"max_segment",7.8)))
                 # DrumSep is substantially heavier than the normal 4-stem audition path.
                 # A shorter segment trades some speed for much lower peak VRAM usage.
-                default=min(model_default,4.0) if str(self.device).lower()!="cpu" else model_default
+                default=min(model_default,4.0) if str(self.device).lower()!="cpu" and self.options.get("safe_gpu",True) else model_default
                 out_dir=pathlib.Path(parent_folder)/"drums"
                 subrow=-(abs(hash((str(parent_folder),str(drum_file),"drumsep")))%9000000+1000000)
                 def save_cb(file,origin,tensor,tags,save_func,item,finish_callback):
