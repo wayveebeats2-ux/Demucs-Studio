@@ -31,12 +31,20 @@ class WaveformLoader(QObject):
 
 class WaveformWidget(QWidget):
     seekRequested=Signal(float)
+    expandRequested=Signal()
     def __init__(self,parent=None): super().__init__(parent); self.peaks=None; self.progress=0.0; self.setMinimumWidth(150); self.setFixedHeight(38); self.setCursor(Qt.CursorShape.PointingHandCursor)
     def set_peaks(self,peaks): self.peaks=peaks; self.update()
     def set_progress(self,value): self.progress=max(0.0,min(1.0,float(value))); self.update()
     def mousePressEvent(self,event):
         if event.button()==Qt.MouseButton.LeftButton and self.width()>0:self.seekRequested.emit(event.position().x()/self.width())
         super().mousePressEvent(event)
+    def mouseDoubleClickEvent(self,event):
+        if event.button()==Qt.MouseButton.LeftButton:self.expandRequested.emit();event.accept();return
+        super().mouseDoubleClickEvent(event)
+    def contextMenuEvent(self,event):
+        from PySide6.QtWidgets import QMenu
+        menu=QMenu(self); action=menu.addAction("Expand Waveform")
+        if menu.exec(event.globalPos())==action:self.expandRequested.emit()
     def mouseMoveEvent(self,event):
         if event.buttons() & Qt.MouseButton.LeftButton and self.width()>0:self.seekRequested.emit(event.position().x()/self.width())
         super().mouseMoveEvent(event)
