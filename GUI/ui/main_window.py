@@ -28,7 +28,7 @@ class StudioWindow(QMainWindow):
         self.settings_page=QWidget(); sv=QVBoxLayout(self.settings_page); sv.setContentsMargins(0,0,0,0); sv.setSpacing(14)
         settings_panel=QFrame(); settings_panel.setObjectName("panel"); sp=QVBoxLayout(settings_panel); st=QLabel("⚙  SETTINGS"); st.setObjectName("section"); sp.addWidget(st)
         info=QLabel("Studio defaults are saved automatically and used for future separations."); info.setObjectName("muted"); sp.addWidget(info)
-        defaults=QFrame(); defaults.setObjectName("deviceCard"); dv=QVBoxLayout(defaults); dt=QLabel("PROCESSING DEFAULTS"); dt.setObjectName("section"); dv.addWidget(dt)
+        defaults=QFrame(); defaults.setObjectName("deviceCard"); dv=QVBoxLayout(defaults); dv.setContentsMargins(16,14,16,14); dv.setSpacing(9); dt=QLabel("PROCESSING DEFAULTS"); dt.setObjectName("section"); dv.addWidget(dt)
         self.settings_preset=QComboBox(); self.settings_preset.addItem("4 Stem • Vocals / Drums / Bass / Other","four"); self.settings_preset.addItem("Vocals + Instrumental • 2 Stem","vocals"); self.settings_preset.addItem("6 Stem","six")
         self.settings_model=QComboBox()
         for i in range(self.model.count()): self.settings_model.addItem(self.model.itemText(i),self.model.itemData(i))
@@ -40,10 +40,10 @@ class StudioWindow(QMainWindow):
         self.settings_collision=QComboBox(); self.settings_collision.addItem("Rename existing","rename"); self.settings_collision.addItem("Overwrite existing","overwrite"); self.settings_collision.addItem("Skip existing","skip")
         self.settings_safe_gpu=QCheckBox("8 GB GPU safe mode"); self.settings_safe_gpu.setToolTip("Uses conservative segment sizes for memory-heavy secondary models."); import shared; self.settings_safe_gpu.setChecked(bool((shared.GetHistory("studio_prefs",default={}) or {}).get("safe_gpu",True)))
         for label,widget in [("Preset",self.settings_preset),("Model",self.settings_model),("Segment length",self.settings_segment),("Overlap",self.settings_overlap),("Shifts",self.settings_shifts),("Input gain",self.settings_gain),("Output format",self.settings_depth),("Existing files",self.settings_collision)]:
-            rr=QHBoxLayout(); rr.addWidget(QLabel(label)); rr.addStretch(); rr.addWidget(widget); dv.addLayout(rr)
-        gpu_row=QHBoxLayout(); gpu_row.addWidget(QLabel("GPU memory")); gpu_row.addStretch(); gpu_row.addWidget(self.settings_safe_gpu); dv.addLayout(gpu_row)
+            rr=QHBoxLayout(); rr.setSpacing(14); lab=QLabel(label); lab.setMinimumWidth(150); rr.addWidget(lab); rr.addStretch(1); widget.setMinimumWidth(300); widget.setMaximumWidth(420); rr.addWidget(widget); dv.addLayout(rr)
+        gpu_row=QHBoxLayout(); gpu_lab=QLabel("GPU memory"); gpu_lab.setMinimumWidth(150); gpu_row.addWidget(gpu_lab); gpu_row.addStretch(1); self.settings_safe_gpu.setMinimumWidth(300); gpu_row.addWidget(self.settings_safe_gpu); dv.addLayout(gpu_row)
         self._sync_settings_from_workspace()
-        output_row=QHBoxLayout(); output_row.addWidget(QLabel("Default output folder")); self.settings_output_value=QLabel(self.output_dir or "Source-relative / separated"); self.settings_output_value.setObjectName("muted"); output_row.addWidget(self.settings_output_value,1); choose_output=QPushButton("Choose…")
+        output_row=QHBoxLayout(); output_row.setSpacing(10); out_lab=QLabel("Default output folder"); out_lab.setMinimumWidth(150); output_row.addWidget(out_lab); self.settings_output_value=QLabel(self.output_dir or "Source-relative / separated"); self.settings_output_value.setObjectName("muted"); output_row.addWidget(self.settings_output_value,1); choose_output=QPushButton("Choose…")
         def choose_settings_output():
             folder=QFileDialog.getExistingDirectory(self,"Choose output folder",self.output_dir or str(Path.home()))
             if folder:self.output_dir=folder; self.settings_output_value.setText(folder)
