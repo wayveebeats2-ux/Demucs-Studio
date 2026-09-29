@@ -1,6 +1,6 @@
 import os,sys,subprocess
 from pathlib import Path
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt,QTimer
 from PySide6.QtWidgets import QCheckBox,QFileDialog,QFrame,QHBoxLayout,QLabel,QPushButton,QSlider,QVBoxLayout
 from ui.waveform import WaveformLoader,WaveformWidget
 from ui.audition import AuditionMixer
@@ -12,14 +12,29 @@ class StemResults(QFrame):
     def show_results(self,row,folder,outputs):
         self.hint.hide(); divider=QFrame(); divider.setFrameShape(QFrame.Shape.HLine); self.layout.addWidget(divider); group={"folder":folder,"stems":list(outputs),"state":{stem:{"mute":False,"solo":False,"db":0.0} for stem,_ in outputs}}; self.groups[row]=group
         head=QHBoxLayout(); label=QLabel("✓  "+Path(folder).parent.name); label.setObjectName("success"); audition=QPushButton("▶ Play Mix"); audition.setObjectName("primary"); stop=QPushButton("■ Stop"); export=QPushButton("Export Mix"); export.clicked.connect(lambda checked=False,r=row:self._export_mix(r)); open_btn=QPushButton("Open Folder"); audition.clicked.connect(lambda checked=False,r=row:self._toggle_mix(r)); stop.clicked.connect(self.mixer.stop); open_btn.clicked.connect(lambda:self.open_folder(folder)); head.addWidget(label); head.addStretch(); head.addWidget(audition); head.addWidget(stop); head.addWidget(export); head.addWidget(open_btn); self.layout.addLayout(head)
-        transport=QHBoxLayout(); timeline=QSlider(Qt.Orientation.Horizontal); timeline.setRange(0,0); timeline.setTracking(False); clock=QLabel("0:00 / 0:00"); clock.setObjectName("muted"); timeline.sliderMoved.connect(self.mixer.seek); transport.addWidget(timeline,1); transport.addWidget(clock); self.layout.addLayout(transport)
+        transport=QHBoxLayout(); timeline=QSlider(Qt.Orientation.Horizontal); timeline.setRange(0,0); timeline.setTracking(True); clock=QLabel("0:00 / 0:00"); clock.setObjectName("muted"); timeline.sliderMoved.connect(lambda ms,r=row:self._seek(r,ms)); transport.addWidget(timeline,1); transport.addWidget(clock); self.layout.addLayout(transport)
         group["timeline"]=timeline; group["clock"]=clock; group["play_button"]=audition
         self.mixer.positionChanged.connect(lambda ms,r=row:self._position(r,ms)); self.mixer.durationChanged.connect(lambda ms,r=row:self._duration(r,ms)); self.mixer.playingChanged.connect(lambda playing,r=row:self._playing(r,playing))
         for stem,file in outputs:
-            line=QHBoxLayout(); name=QLabel("●  "+stem.title()); name.setObjectName("accent"); name.setMinimumWidth(90); solo=QCheckBox("S"); solo.setToolTip("Solo"); mute=QCheckBox("M"); mute.setToolTip("Mute"); volume=QSlider(Qt.Orientation.Horizontal); volume.setRange(-24,6); volume.setValue(0); volume.setFixedWidth(75); volume.setToolTip("Stem audition gain (dB)"); wave=WaveformWidget(); self.waveforms[file]=wave
+            line=QHBoxLayout(); name=QLabel("●  "+stem.title()); name.setObjectName("accent"); name.setMinimumWidth(90); solo=QCheckBox("S"); solo.setToolTip("Solo"); mute=QCheckBox("M"); mute.setToolTip("Mute"); volume=QSlider(Qt.Orientation.Horizontal); volume.setRange(-24,6); volume.setValue(0); volume.setFixedWidth(75); volume.setToolTip("Stem audition gain (dB)"); wave=WaveformWidget(); self.waveforms[file]=wave; group.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._wave_seek(r,fraction))
             solo.toggled.connect(lambda v,r=row,s=stem:self._state(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=stem:self._state(r,s,"mute",v)); volume.valueChanged.connect(lambda v,r=row,s=stem:self._state(r,s,"db",float(v)))
             line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(volume); line.addWidget(wave,1); self.layout.addLayout(line); self.loader.request(file)
-    def _state(self,row,stem,key,value):self.groups[row]["state"][stem][key]=value
+    def _state(self,row,stem,key,value):
+        self.groups[row]["state"][stem][key]=value
+        if row==self.active_row and self.mixer.player.source().isValid():
+            g=self.groups[row]
+            if g.get("rerender_timer") is None:
+                g["rerender_timer"]=QTimer(self); g["rerender_timer"].setSingleShot(True); g["rerender_timer"].timeout.connect(lambda r=row:self._rerender(r))
+            g["rerender_timer"].start(120)
+    def _rerender(self,row):
+        if row!=self.active_row:return
+        g=self.groups[row]; self.mixer.render_and_play(row,g["stems"],g["state"])
+    def _seek(self,row,ms):
+        if row==self.active_row:self.mixer.seek(ms)
+    def _wave_seek(self,row,fraction):
+        if row!=self.active_row:return
+        g=self.groups[row]; duration=g["timeline"].maximum()
+        if duration>0:self.mixer.seek(int(duration*max(0.0,min(1.0,fraction))))
     def _toggle_mix(self,row):
         if self.active_row==row and self.mixer.player.source().isValid():
             self.mixer.play_pause(); return
@@ -34,6 +49,9 @@ class StemResults(QFrame):
         if row!=self.active_row:return
         g=self.groups.get(row)
         if g and not g["timeline"].isSliderDown():g["timeline"].setValue(ms)
+        if g and g["timeline"].maximum()>0:
+            progress=float(ms)/g["timeline"].maximum()
+            for wave in g.get("waves",[]):wave.set_progress(progress)
         if g:g["clock"].setText(f"{self._fmt(ms)} / {self._fmt(g['timeline'].maximum())}")
     def _duration(self,row,ms):
         if row!=self.active_row:return
