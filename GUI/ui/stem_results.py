@@ -71,14 +71,14 @@ class StemResults(QFrame):
             item=layout.takeAt(0)
             if item.widget():item.widget().deleteLater()
         g["drum_substems"]=list(outputs); g["drum_state"]={stem:{"mute":False,"solo":False,"db":0.0} for stem,_ in outputs}
-        audition=QPushButton("▶ Audition Drum Stems"); audition.setObjectName("primary"); audition.setFixedHeight(28); audition.clicked.connect(lambda checked=False,r=row:self._toggle_drum_mix(r)); layout.addWidget(audition); g["drum_play_button"]=audition
+        audition=QPushButton("▶ Audition Drum Stems"); audition.setObjectName("primary"); audition.setMinimumHeight(40); audition.clicked.connect(lambda checked=False,r=row:self._toggle_drum_mix(r)); layout.addWidget(audition); g["drum_play_button"]=audition
         for stem,file in outputs:
             key="drum:"+stem
             row_widget=QWidget(); row_widget.setFixedHeight(30); line=QHBoxLayout(row_widget); line.setContentsMargins(0,0,0,0); line.setSpacing(7); name=QLabel("↳  "+stem.title()); name.setObjectName("muted"); name.setFixedWidth(92); solo=QCheckBox("S"); solo.setFixedWidth(42); mute=QCheckBox("M"); mute.setFixedWidth(42); gain=QSlider(Qt.Orientation.Horizontal); gain.setRange(-24,6); gain.setValue(0); gain.setFixedWidth(76); wave=WaveformWidget(); wave.setFixedHeight(24)
             self.waveforms[file]=wave; g.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._drum_wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=key,f=file:self._expand_drum_wave(r,s,f))
             solo.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"mute",v)); gain.valueChanged.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"db",float(v)))
             g.setdefault("controls",{})[key]={"solo":solo,"mute":mute,"volume":gain}; line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(gain); line.addWidget(wave,1); layout.addWidget(row_widget); self.loader.request(file)
-        g["drum_children_height"]=42 + (33*len(outputs)); g["drum_disclosure"].show(); g["drum_children_widget"].setFixedHeight(g["drum_children_height"]); g["drum_children_widget"].show(); g["drum_disclosure"].setText("▼")
+        g["drum_children_height"]=56 + (33*len(outputs)); g["drum_disclosure"].show(); g["drum_children_widget"].setFixedHeight(g["drum_children_height"]); g["drum_children_widget"].show(); g["drum_disclosure"].setText("▼")
 
     def _drum_state(self,row,stem,field,value):
         g=self.groups[row]; g["drum_state"][stem][field]=value
