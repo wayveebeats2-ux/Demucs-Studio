@@ -18,6 +18,8 @@ QPushButton#primary { background:#7d4cff; border:1px solid #9d75ff; color:white;
 QPushButton#primary:hover { background:#9167ff; }
 QComboBox,QSpinBox,QDoubleSpinBox { background:#151c28; border:1px solid #303b50; border-radius:8px; padding:7px 9px; min-height:20px; }
 QComboBox:hover,QSpinBox:hover,QDoubleSpinBox:hover { border-color:#7057b8; }
+QComboBox::drop-down { subcontrol-origin:padding; subcontrol-position:top right; width:34px; border-left:1px solid #303b50; border-top-right-radius:8px; border-bottom-right-radius:8px; }
+QComboBox::down-arrow { width:10px; height:10px; }
 QListWidget { background:transparent; border:none; outline:none; }
 QListWidget::item { background:#151c28; border:1px solid #263044; border-radius:9px; padding:12px; margin:3px 0; }
 QListWidget::item:selected { background:#182746; border:1px solid #3569c8; }
