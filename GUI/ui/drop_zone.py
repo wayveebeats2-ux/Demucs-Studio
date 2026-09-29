@@ -22,6 +22,8 @@ class DropZone(QFrame):
         hint = QLabel("or click Add Tracks  •  WAV, FLAC, MP3 and other FFmpeg-supported audio")
         hint.setObjectName("muted")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(title)
         layout.addWidget(hint)
 
@@ -35,6 +37,12 @@ class DropZone(QFrame):
             self.setProperty("dragActive", True)
             self.style().unpolish(self); self.style().polish(self)
             event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls(): event.acceptProposedAction()
+        else: event.ignore()
 
     def dragLeaveEvent(self, event):
         self._reset_drag()
