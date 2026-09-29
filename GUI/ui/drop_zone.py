@@ -6,11 +6,13 @@ from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 class DropZone(QFrame):
     filesDropped = Signal(list)
+    clicked = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("dropZone")
         self.setAcceptDrops(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setMinimumHeight(170)
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -22,6 +24,11 @@ class DropZone(QFrame):
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
         layout.addWidget(hint)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
