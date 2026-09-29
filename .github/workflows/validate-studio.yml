@@ -23,4 +23,4 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile modern UI sources
-        run: python -m py_compile GUI/StudioMain.py GUI/ui/__init__.py GUI/ui/theme.py GUI/ui/drop_zone.py GUI/ui/main_window.py GUI/ui/controller.py GUI/ui/stem_results.py GUI/ui/media_info.py GUI/ui/waveform.py GUI/ui/audition.py
+        run: python -m py_compile GUI/StudioMain.py GUI/ui/__init__.py GUI/ui/theme.py GUI/ui/drop_zone.py GUI/ui/main_window.py GUI/ui/controller.py GUI/ui/stem_results.py GUI/ui/media_info.py GUI/ui/waveform.py GUI/ui/audition.py GUI/ui/library_store.py GUI/ui/library_view.py
