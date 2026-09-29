@@ -39,8 +39,7 @@ class StudioWindow(QMainWindow):
         existing={self.queue.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.queue.count())}
         for file in files:
             if file not in existing:
-                self.queue.addItem("◌  "+Path(file).name+"
-    Reading metadata…"); item=self.queue.item(self.queue.count()-1); item.setData(Qt.ItemDataRole.UserRole,file); item.setSizeHint(QSize(0,58)); existing.add(file); self.media.request(file)
+                self.queue.addItem("◌  "+Path(file).name+"\\n    Reading metadata…"); item=self.queue.item(self.queue.count()-1); item.setData(Qt.ItemDataRole.UserRole,file); item.setSizeHint(QSize(0,58)); existing.add(file); self.media.request(file)
         self._refresh_enabled()
     @staticmethod
     def _duration(seconds):
@@ -53,8 +52,7 @@ class StudioWindow(QMainWindow):
             item=self.queue.item(i)
             if item.data(Qt.ItemDataRole.UserRole)==path:
                 title=info.get("title") or Path(path).stem; artist=info.get("artist") or "Unknown artist"
-                item.setText(f"♫  {title}
-    {artist}   •   {self._duration(info.get('duration'))}   •   {self._size(info.get('size'))}")
+                item.setText(f"♫  {title}\\n    {artist}   •   {self._duration(info.get('duration'))}   •   {self._size(info.get('size'))}")
                 art=info.get("artwork")
                 if art:
                     px=QPixmap(); px.loadFromData(art); item.setIcon(QIcon(px))
