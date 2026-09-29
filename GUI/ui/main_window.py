@@ -54,8 +54,7 @@ class StudioWindow(QMainWindow):
         added=0
         for file in expanded:
             if file not in existing:
-                self.queue.addItem("◌  "+Path(file).name+"
-    Reading metadata…"); item=self.queue.item(self.queue.count()-1); item.setData(Qt.ItemDataRole.UserRole,file); item.setSizeHint(QSize(0,58)); existing.add(file); self.media.request(file); added+=1
+                self.queue.addItem("◌  "+Path(file).name+"\\n    Reading metadata…"); item=self.queue.item(self.queue.count()-1); item.setData(Qt.ItemDataRole.UserRole,file); item.setSizeHint(QSize(0,58)); existing.add(file); self.media.request(file); added+=1
         if files and not added and not any(str(x) in existing for x in expanded):
             QMessageBox.warning(self,"No audio added","No supported audio files were found.")
         self._refresh_enabled()
@@ -70,8 +69,7 @@ class StudioWindow(QMainWindow):
             item=self.queue.item(i)
             if item.data(Qt.ItemDataRole.UserRole)==path:
                 title=info.get("title") or Path(path).stem; artist=info.get("artist") or "Unknown artist"
-                item.setText(f"♫  {title}
-    {artist}   •   {self._duration(info.get('duration'))}   •   {self._size(info.get('size'))}")
+                item.setText(f"♫  {title}\\n    {artist}   •   {self._duration(info.get('duration'))}   •   {self._size(info.get('size'))}")
                 art=info.get("artwork")
                 if art:
                     px=QPixmap(); px.loadFromData(art); item.setIcon(QIcon(px))
