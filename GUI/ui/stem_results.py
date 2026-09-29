@@ -55,7 +55,7 @@ class StemResults(QFrame):
         for stem,file in outputs:
             key="drum:"+stem
             line=QHBoxLayout(); name=QLabel("↳  "+stem.title()); name.setObjectName("muted"); name.setMinimumWidth(90); solo=QCheckBox("S"); mute=QCheckBox("M"); gain=QSlider(Qt.Orientation.Horizontal); gain.setRange(-24,6); gain.setValue(0); gain.setFixedWidth(75); wave=WaveformWidget()
-            self.waveforms[file]=wave; g.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=key,f=file:self._expand_wave(r,s,f))
+            self.waveforms[file]=wave; g.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._drum_wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=key,f=file:self._expand_drum_wave(r,s,f))
             solo.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"mute",v)); gain.valueChanged.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"db",float(v)))
             g.setdefault("controls",{})[key]={"solo":solo,"mute":mute,"volume":gain}; line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(gain); line.addWidget(wave,1); layout.addLayout(line); self.loader.request(file)
         g["drum_disclosure"].show(); g["drum_children_widget"].show(); g["drum_disclosure"].setText("▾")
@@ -70,6 +70,20 @@ class StemResults(QFrame):
             self.drum_mixer.play_pause(); return
         self.mixer.pause(); self.active_drum_row=row
         self.drum_mixer.load(-row-10000000,g.get("drum_substems",[]),g.get("drum_state",{})); self.drum_mixer.play()
+
+    def _drum_wave_seek(self,row,fraction):
+        if row!=self.active_drum_row:return
+        duration=self.drum_mixer._duration
+        if duration>0:self.drum_mixer.seek(int(duration*max(0.0,min(1.0,fraction))))
+
+    def _expand_drum_wave(self,row,stem,file):
+        g=self.groups[row]; dlg=QDialog(self); dlg.setWindowTitle(f"{stem.replace('drum:','').title()} • Drum Audition"); dlg.resize(900,300)
+        v=QVBoxLayout(dlg); title=QLabel(stem.replace("drum:","").upper()); title.setObjectName("section"); v.addWidget(title)
+        wave=WaveformWidget(); wave.setMinimumHeight(130); src=self.waveforms.get(file)
+        if src is not None:wave.set_peaks(src.peaks)
+        wave.seekRequested.connect(lambda fraction,r=row:self._drum_wave_seek(r,fraction)); v.addWidget(wave,1)
+        controls=QHBoxLayout(); play=QPushButton("Play / Pause Drum Stems"); stop=QPushButton("Stop"); play.clicked.connect(lambda:self._toggle_drum_mix(row)); stop.clicked.connect(self.drum_mixer.stop); controls.addWidget(play); controls.addWidget(stop); controls.addStretch(); v.addLayout(controls); dlg.show()
+        entry={"dialog":dlg,"wave":wave,"clock":QLabel(),"row":None}; self.expanded.append(entry); dlg.finished.connect(lambda _=0,e=entry:self.expanded.remove(e) if e in self.expanded else None)
 
     def _expand_wave(self,row,stem,file):
         g=self.groups[row]; dlg=QDialog(self); dlg.setWindowTitle(f"{stem.title()} • Expanded Waveform"); dlg.resize(900,300); dlg.setMinimumSize(560,220)
@@ -99,7 +113,7 @@ class StemResults(QFrame):
     def _toggle_mix(self,row):
         if self.active_row==row and self.mixer.players:
             self.mixer.play_pause(); return
-        self.active_row=row; g=self.groups[row]; self.mixer.load(row,g["stems"],g["state"]); self.mixer.play()
+        self.drum_mixer.pause(); self.active_row=row; g=self.groups[row]; self.mixer.load(row,g["stems"],g["state"]); self.mixer.play()
     def _export_mix(self,row):
         g=self.groups[row]; default=str(Path(g["folder"])/"audition_mix.wav"); target,_=QFileDialog.getSaveFileName(self,"Export audition mix",default,"WAV audio (*.wav)")
         if target:self.mixer.export(row,g["stems"],g["state"],target)
