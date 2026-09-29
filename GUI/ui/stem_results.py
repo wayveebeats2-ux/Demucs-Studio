@@ -19,7 +19,7 @@ class SeekSlider(QSlider):
 
 class StemResults(QFrame):
     def __init__(self,parent=None):
-        super().__init__(parent); self.setObjectName("panel"); self.groups={}; self.waveforms={}; self.loader=WaveformLoader(self); self.loader.ready.connect(self._wave_ready); self.mixer=AuditionMixer(self); self.active_row=None; self.transport_slider=None; self.time_label=None; self.play_button=None; self.expanded=[]
+        super().__init__(parent); self.setObjectName("panel"); self.groups={}; self.waveforms={}; self.loader=WaveformLoader(self); self.loader.ready.connect(self._wave_ready); self.mixer=AuditionMixer(self); self.drum_mixer=AuditionMixer(self); self.active_row=None; self.active_drum_row=None; self.transport_slider=None; self.time_label=None; self.play_button=None; self.expanded=[]
         self.layout=QVBoxLayout(self); title=QLabel("♫  RESULTS"); title.setObjectName("section"); self.layout.addWidget(title); self.hint=QLabel("Completed stems will appear here."); self.hint.setObjectName("muted"); self.layout.addWidget(self.hint)
     def show_results(self,row,folder,outputs):
         self.hint.hide(); divider=QFrame(); divider.setFrameShape(QFrame.Shape.HLine); self.layout.addWidget(divider); group={"folder":folder,"stems":list(outputs),"state":{stem:{"mute":False,"solo":False,"db":0.0} for stem,_ in outputs}}; self.groups[row]=group
@@ -53,20 +53,23 @@ class StemResults(QFrame):
             if item.widget():item.widget().deleteLater()
         g["drum_substems"]=list(outputs)
         for stem,file in outputs:
-            key="drum:"+stem; g["state"][key]={"mute":False,"solo":False,"db":0.0}
+            key="drum:"+stem
             line=QHBoxLayout(); name=QLabel("↳  "+stem.title()); name.setObjectName("muted"); name.setMinimumWidth(90); solo=QCheckBox("S"); mute=QCheckBox("M"); gain=QSlider(Qt.Orientation.Horizontal); gain.setRange(-24,6); gain.setValue(0); gain.setFixedWidth(75); wave=WaveformWidget()
             self.waveforms[file]=wave; g.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=key,f=file:self._expand_wave(r,s,f))
-            solo.toggled.connect(lambda v,r=row,s=key:self._substate(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=key:self._substate(r,s,"mute",v)); gain.valueChanged.connect(lambda v,r=row,s=key:self._substate(r,s,"db",float(v)))
+            solo.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"solo",v)); mute.toggled.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"mute",v)); gain.valueChanged.connect(lambda v,r=row,s=stem:self._drum_state(r,s,"db",float(v)))
             g.setdefault("controls",{})[key]={"solo":solo,"mute":mute,"volume":gain}; line.addWidget(name); line.addWidget(solo); line.addWidget(mute); line.addWidget(gain); line.addWidget(wave,1); layout.addLayout(line); self.loader.request(file)
         g["drum_disclosure"].show(); g["drum_children_widget"].show(); g["drum_disclosure"].setText("▾")
 
-    def _substate(self,row,key,field,value):
-        g=self.groups[row]; g["state"][key][field]=value
-        if not any(name==key for name,_ in g["stems"]):
-            path=next((p for n,p in g.get("drum_substems",[]) if "drum:"+n==key),None)
-            if path:g["stems"].append((key,path))
-        if row==self.active_row:
-            self.mixer.stems=g["stems"]; self.mixer.state=g["state"]; self.mixer.apply_state()
+    def _drum_state(self,row,stem,field,value):
+        g=self.groups[row]; g["drum_state"][stem][field]=value
+        if row==self.active_drum_row:self.drum_mixer.apply_state()
+
+    def _toggle_drum_mix(self,row):
+        g=self.groups[row]
+        if self.active_drum_row==row and self.drum_mixer.players:
+            self.drum_mixer.play_pause(); return
+        self.mixer.pause(); self.active_drum_row=row
+        self.drum_mixer.load(-row-10000000,g.get("drum_substems",[]),g.get("drum_state",{})); self.drum_mixer.play()
 
     def _expand_wave(self,row,stem,file):
         g=self.groups[row]; dlg=QDialog(self); dlg.setWindowTitle(f"{stem.title()} • Expanded Waveform"); dlg.resize(900,300); dlg.setMinimumSize(560,220)
