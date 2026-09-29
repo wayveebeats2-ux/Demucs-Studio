@@ -22,11 +22,28 @@ class StemResults(QFrame):
     def __init__(self,parent=None):
         super().__init__(parent); self.setObjectName("panel"); self.groups={}; self.waveforms={}; self.loader=WaveformLoader(self); self.loader.ready.connect(self._wave_ready); self.mixer=AuditionMixer(self); self.drum_mixer=AuditionMixer(self); self.active_row=None; self.active_drum_row=None; self.transport_slider=None; self.time_label=None; self.play_button=None; self.expanded=[]
         self.mixer.positionChanged.connect(self._active_position); self.mixer.durationChanged.connect(self._active_duration); self.mixer.playingChanged.connect(self._active_playing)
-        self.layout=QVBoxLayout(self); title=QLabel("♫  RESULTS"); title.setObjectName("section"); self.layout.addWidget(title); self.hint=QLabel("Completed stems will appear here."); self.hint.setObjectName("muted"); self.layout.addWidget(self.hint)
+        self.layout=QVBoxLayout(self); title=QLabel("♫  RESULTS"); title.setObjectName("section"); self.layout.addWidget(title); self.hint=QLabel("Completed stems will appear here."); self.hint.setObjectName("muted"); self.layout.addWidget(self.hint); self.result_widgets=[]
+    def _clear_current_result(self):
+        self.mixer.stop(); self.drum_mixer.stop()
+        for entry in list(self.expanded):
+            try: entry["dialog"].close()
+            except Exception: pass
+        self.expanded.clear()
+        for widget in self.result_widgets:
+            widget.deleteLater()
+        self.result_widgets.clear()
+        self.groups.clear(); self.waveforms.clear(); self.active_row=None; self.active_drum_row=None
+
+    def _add_result_widget(self,widget,stretch=0):
+        self.layout.addWidget(widget,stretch); self.result_widgets.append(widget)
+
+    def _layout_widget(self,layout):
+        wrapper=QWidget(); wrapper.setLayout(layout); self._add_result_widget(wrapper); return wrapper
+
     def show_results(self,row,folder,outputs):
-        self.hint.hide(); divider=QFrame(); divider.setFrameShape(QFrame.Shape.HLine); self.layout.addWidget(divider); group={"folder":folder,"stems":list(outputs),"state":{stem:{"mute":False,"solo":False,"db":0.0} for stem,_ in outputs}}; self.groups[row]=group
-        head=QHBoxLayout(); label=QLabel("✓  "+Path(folder).name); label.setObjectName("success"); audition=QPushButton("▶ Play Mix"); audition.setObjectName("primary"); stop=QPushButton("■ Stop"); export=QPushButton("Export Mix"); export.clicked.connect(lambda checked=False,r=row:self._export_mix(r)); open_btn=QPushButton("Open Folder"); audition.clicked.connect(lambda checked=False,r=row:self._toggle_mix(r)); stop.clicked.connect(self.mixer.stop); open_btn.clicked.connect(lambda:self.open_folder(folder)); head.addWidget(label); head.addStretch(); head.addWidget(audition); head.addWidget(stop); head.addWidget(export); head.addWidget(open_btn); self.layout.addLayout(head)
-        transport=QHBoxLayout(); timeline=SeekSlider(Qt.Orientation.Horizontal); timeline.setRange(0,0); timeline.setTracking(True); clock=QLabel("0:00 / 0:00"); clock.setObjectName("muted"); timeline.sliderMoved.connect(lambda ms,r=row:self._seek(r,ms)); transport.addWidget(timeline,1); transport.addWidget(clock); self.layout.addLayout(transport)
+        self._clear_current_result(); self.hint.hide(); divider=QFrame(); divider.setFrameShape(QFrame.Shape.HLine); self._add_result_widget(divider); group={"folder":folder,"stems":list(outputs),"state":{stem:{"mute":False,"solo":False,"db":0.0} for stem,_ in outputs}}; self.groups[row]=group
+        head=QHBoxLayout(); label=QLabel("✓  "+Path(folder).name); label.setObjectName("success"); audition=QPushButton("▶ Play Mix"); audition.setObjectName("primary"); stop=QPushButton("■ Stop"); export=QPushButton("Export Mix"); export.clicked.connect(lambda checked=False,r=row:self._export_mix(r)); open_btn=QPushButton("Open Folder"); audition.clicked.connect(lambda checked=False,r=row:self._toggle_mix(r)); stop.clicked.connect(self.mixer.stop); open_btn.clicked.connect(lambda:self.open_folder(folder)); head.addWidget(label); head.addStretch(); head.addWidget(audition); head.addWidget(stop); head.addWidget(export); head.addWidget(open_btn); self._layout_widget(head)
+        transport=QHBoxLayout(); timeline=SeekSlider(Qt.Orientation.Horizontal); timeline.setRange(0,0); timeline.setTracking(True); clock=QLabel("0:00 / 0:00"); clock.setObjectName("muted"); timeline.sliderMoved.connect(lambda ms,r=row:self._seek(r,ms)); transport.addWidget(timeline,1); transport.addWidget(clock); self._layout_widget(transport)
         group["timeline"]=timeline; group["clock"]=clock; group["play_button"]=audition
         for stem,file in outputs:
             line=QHBoxLayout(); name_box=QWidget(); name_layout=QHBoxLayout(name_box); name_layout.setContentsMargins(0,0,0,0); name_layout.setSpacing(4); name=QLabel("●  "+stem.title()); name.setObjectName("accent"); name.setMinimumWidth(0); solo=QCheckBox("S"); solo.setToolTip("Solo"); mute=QCheckBox("M"); mute.setToolTip("Mute"); volume=QSlider(Qt.Orientation.Horizontal); volume.setRange(-24,6); volume.setValue(0); volume.setFixedWidth(75); volume.setToolTip("Stem audition gain (dB)"); wave=WaveformWidget(); wave.allowDrumRefine=(stem.lower()=="drums"); self.waveforms[file]=wave; group.setdefault("waves",[]).append(wave); wave.seekRequested.connect(lambda fraction,r=row:self._wave_seek(r,fraction)); wave.expandRequested.connect(lambda r=row,s=stem,f=file:self._expand_wave(r,s,f)); wave.refineDrumsRequested.connect(lambda r=row,s=stem,f=file:self.drumRefineRequested.emit(r,f,self.groups[r]["folder"]))
@@ -35,9 +52,9 @@ class StemResults(QFrame):
             if stem.lower()=="drums":
                 disclosure=QPushButton("▶"); disclosure.setFlat(True); disclosure.setFixedSize(22,22); disclosure.setCursor(Qt.CursorShape.PointingHandCursor); disclosure.setStyleSheet("QPushButton { border: none; background: transparent; padding: 0; font-size: 11px; } QPushButton:hover { color: #b995ff; }"); disclosure.hide(); disclosure.clicked.connect(lambda checked=False,r=row:self._toggle_drum_children(r)); name_layout.addWidget(name); name_layout.addWidget(disclosure); name_layout.addStretch(); group["drum_disclosure"]=disclosure
             if stem.lower()!="drums": name_layout.addWidget(name); name_layout.addStretch()
-            name_box.setMinimumWidth(118); line.addWidget(name_box); line.addWidget(solo); line.addWidget(mute); line.addWidget(volume); line.addWidget(wave,1); self.layout.addLayout(line)
+            name_box.setMinimumWidth(118); line.addWidget(name_box); line.addWidget(solo); line.addWidget(mute); line.addWidget(volume); line.addWidget(wave,1); self._layout_widget(line)
             if stem.lower()=="drums":
-                children=QWidget(); child_layout=QVBoxLayout(children); child_layout.setContentsMargins(34,6,0,8); child_layout.setSpacing(3); children.hide(); group["drum_children_widget"]=children; group["drum_children_layout"]=child_layout; self.layout.addWidget(children)
+                children=QWidget(); child_layout=QVBoxLayout(children); child_layout.setContentsMargins(34,6,0,8); child_layout.setSpacing(3); children.hide(); group["drum_children_widget"]=children; group["drum_children_layout"]=child_layout; self._add_result_widget(children)
                 existing_dir=Path(folder)/"drums"; existing=[(n,str(existing_dir/f"{n}.wav")) for n in ("kick","snare","cymbals","toms") if (existing_dir/f"{n}.wav").exists()]
                 if existing:self.add_drum_substems(row,existing)
             self.loader.request(file)
