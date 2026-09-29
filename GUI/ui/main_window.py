@@ -12,7 +12,8 @@ class StudioWindow(QMainWindow):
     deviceChanged=Signal(str); statusChanged=Signal(str); backendReady=Signal(); busyChanged=Signal(bool); modelProgress=Signal(float); trackProgress=Signal(int,float); trackStarted=Signal(int,str); trackStatus=Signal(int,int); trackFinished=Signal(int,int); allFinished=Signal(); errorRaised=Signal(str,str); resultsReady=Signal(int,str,list); libraryChanged=Signal(); drumSubstemsReady=Signal(int,object)
     def __init__(self):
         super().__init__(); self.controller=None; self.setWindowTitle("Demucs Studio"); self.resize(1120,780); self.setMinimumSize(840,620); self.setStyleSheet(DARK_STYLESHEET); self.media=MediaInfoLoader(self); self._build(); self._connect_signals(); self.media.ready.connect(self._metadata_ready)
-    def attach_controller(self,c):\n        self.controller=c; self.results.drumRefineRequested.connect(c.refine_drums)
+    def attach_controller(self,c):
+        self.controller=c; self.results.drumRefineRequested.connect(c.refine_drums)
     def _build(self):
         root=QWidget(); o=QVBoxLayout(root); o.setContentsMargins(22,22,22,22); o.setSpacing(14)
         header=QFrame(); header.setObjectName("header"); h=QHBoxLayout(header); brandbox=QVBoxLayout(); brand=QLabel("DEMUCS  STUDIO"); brand.setObjectName("brand"); subtitle=QLabel("AI POWERED STEM SEPARATION"); subtitle.setObjectName("subtitle"); brandbox.addWidget(brand); brandbox.addWidget(subtitle); self.device=QLabel("●  Starting backend…"); self.device.setObjectName("accent"); h.addLayout(brandbox); h.addStretch(); deviceCard=QFrame(); deviceCard.setObjectName("deviceCard"); dh=QHBoxLayout(deviceCard); dh.setContentsMargins(14,8,14,8); dh.addWidget(self.device); h.addWidget(deviceCard); workspace=QPushButton("SEPARATE"); library=QPushButton("LIBRARY"); h.addWidget(workspace); h.addWidget(library); o.addWidget(header)
@@ -53,7 +54,8 @@ class StudioWindow(QMainWindow):
         added=0
         for file in expanded:
             if file not in existing:
-                self.queue.addItem("◌  "+Path(file).name+"\n    Reading metadata…"); item=self.queue.item(self.queue.count()-1); item.setData(Qt.ItemDataRole.UserRole,file); item.setSizeHint(QSize(0,58)); existing.add(file); self.media.request(file); added+=1
+                self.queue.addItem("◌  "+Path(file).name+"
+    Reading metadata…"); item=self.queue.item(self.queue.count()-1); item.setData(Qt.ItemDataRole.UserRole,file); item.setSizeHint(QSize(0,58)); existing.add(file); self.media.request(file); added+=1
         if files and not added and not any(str(x) in existing for x in expanded):
             QMessageBox.warning(self,"No audio added","No supported audio files were found.")
         self._refresh_enabled()
@@ -68,7 +70,8 @@ class StudioWindow(QMainWindow):
             item=self.queue.item(i)
             if item.data(Qt.ItemDataRole.UserRole)==path:
                 title=info.get("title") or Path(path).stem; artist=info.get("artist") or "Unknown artist"
-                item.setText(f"♫  {title}\n    {artist}   •   {self._duration(info.get('duration'))}   •   {self._size(info.get('size'))}")
+                item.setText(f"♫  {title}
+    {artist}   •   {self._duration(info.get('duration'))}   •   {self._size(info.get('size'))}")
                 art=info.get("artwork")
                 if art:
                     px=QPixmap(); px.loadFromData(art); item.setIcon(QIcon(px))
