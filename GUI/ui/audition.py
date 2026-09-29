@@ -34,13 +34,17 @@ class _MixTask(QRunnable):
         except Exception as exc:self.signals.failed.emit(self.key,str(exc))
 
 class AuditionMixer(QObject):
-    ready=Signal(int); failed=Signal(int,str)
+    ready=Signal(int); failed=Signal(int,str); positionChanged=Signal(int); durationChanged=Signal(int); playingChanged=Signal(bool)
     def __init__(self,parent=None):
-        super().__init__(parent); self.pool=QThreadPool.globalInstance(); self.audio=QAudioOutput(self); self.player=QMediaPlayer(self); self.player.setAudioOutput(self.audio); self.tasks=[]
+        super().__init__(parent); self.pool=QThreadPool.globalInstance(); self.audio=QAudioOutput(self); self.player=QMediaPlayer(self); self.player.setAudioOutput(self.audio); self.tasks=[]; self.player.positionChanged.connect(self.positionChanged); self.player.durationChanged.connect(self.durationChanged); self.player.playbackStateChanged.connect(lambda s:self.playingChanged.emit(s==QMediaPlayer.PlaybackState.PlayingState))
     def render_and_play(self,key,stems,state):
         self.player.stop(); task=_MixTask(key,stems,state); task.signals.ready.connect(self._play); task.signals.failed.connect(self.failed); self.tasks.append(task); self.pool.start(task)
     def export(self,key,stems,state,target,callback=None):
         task=_MixTask(key,stems,state,target); task.signals.ready.connect(lambda k,p: callback(p) if callback else None); task.signals.failed.connect(self.failed); self.tasks.append(task); self.pool.start(task)
     def _play(self,key,path):self.player.setSource(QUrl.fromLocalFile(path));self.player.setPosition(0);self.player.play();self.ready.emit(key)
+    def play_pause(self):
+        if self.player.playbackState()==QMediaPlayer.PlaybackState.PlayingState:self.player.pause()
+        else:self.player.play()
+    def seek(self,ms):self.player.setPosition(max(0,min(int(ms),self.player.duration())))
     def pause(self):self.player.pause()
     def stop(self):self.player.stop();self.player.setPosition(0)
