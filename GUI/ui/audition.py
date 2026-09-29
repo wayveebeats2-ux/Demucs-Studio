@@ -36,16 +36,27 @@ class _MixTask(QRunnable):
 class AuditionMixer(QObject):
     ready=Signal(int); failed=Signal(int,str); positionChanged=Signal("qlonglong"); durationChanged=Signal("qlonglong"); playingChanged=Signal(bool)
     def __init__(self,parent=None):
-        super().__init__(parent); self.pool=QThreadPool.globalInstance(); self.audio=QAudioOutput(self); self.player=QMediaPlayer(self); self.player.setAudioOutput(self.audio); self.tasks=[]; self.player.positionChanged.connect(self.positionChanged); self.player.durationChanged.connect(self.durationChanged); self.player.playbackStateChanged.connect(lambda s:self.playingChanged.emit(s==QMediaPlayer.PlaybackState.PlayingState))
+        super().__init__(parent); self.pool=QThreadPool.globalInstance(); self.audio=QAudioOutput(self); self.player=QMediaPlayer(self); self.player.setAudioOutput(self.audio); self.tasks=[]; self._generation=0; self._pending=None
+        self.player.positionChanged.connect(self.positionChanged); self.player.durationChanged.connect(self.durationChanged); self.player.playbackStateChanged.connect(lambda s:self.playingChanged.emit(s==QMediaPlayer.PlaybackState.PlayingState)); self.player.mediaStatusChanged.connect(self._media_status)
     def render_and_play(self,key,stems,state,resume_position=None,resume_playing=None):
         if resume_position is None: resume_position=self.player.position()
         if resume_playing is None: resume_playing=self.player.playbackState()==QMediaPlayer.PlaybackState.PlayingState
-        task=_MixTask(key,stems,state,resume=(int(resume_position),bool(resume_playing))); task.signals.ready.connect(self._play); task.signals.failed.connect(self.failed); self.tasks.append(task); self.pool.start(task)
+        self._generation+=1; generation=self._generation
+        snapshot={name:dict(values) for name,values in state.items()}
+        task=_MixTask(key,stems,snapshot,resume=(int(resume_position),bool(resume_playing))); task.signals.ready.connect(lambda k,p,r,g=generation:self._mix_ready(k,p,r,g)); task.signals.failed.connect(self.failed); self.tasks.append(task); self.pool.start(task)
     def export(self,key,stems,state,target,callback=None):
         task=_MixTask(key,stems,state,target); task.signals.ready.connect(lambda k,p,resume: callback(p) if callback else None); task.signals.failed.connect(self.failed); self.tasks.append(task); self.pool.start(task)
-    def _play(self,key,path,resume):
-        pos,was_playing=resume or (0,True)
-        self.player.stop(); self.player.setSource(QUrl.fromLocalFile(path)); self.player.setPosition(max(0,int(pos)))
+    def _mix_ready(self,key,path,resume,generation):
+        if generation!=self._generation:return
+        pos,was_playing=resume or (0,True); self._pending=(key,max(0,int(pos)),bool(was_playing),generation)
+        self.player.stop(); self.player.setSource(QUrl.fromLocalFile(path))
+    def _media_status(self,status):
+        if not self._pending:return
+        if status not in (QMediaPlayer.MediaStatus.LoadedMedia,QMediaPlayer.MediaStatus.BufferedMedia):return
+        key,pos,was_playing,generation=self._pending
+        if generation!=self._generation:self._pending=None;return
+        self._pending=None
+        self.player.setPosition(min(pos,max(0,self.player.duration())))
         if was_playing:self.player.play()
         else:self.player.pause()
         self.ready.emit(key)
