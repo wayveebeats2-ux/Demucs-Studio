@@ -18,6 +18,7 @@ class SeekSlider(QSlider):
         super().mouseMoveEvent(event)
 
 class StemResults(QFrame):
+    drumRefineRequested=Signal(int,str,str)
     def __init__(self,parent=None):
         super().__init__(parent); self.setObjectName("panel"); self.groups={}; self.waveforms={}; self.loader=WaveformLoader(self); self.loader.ready.connect(self._wave_ready); self.mixer=AuditionMixer(self); self.drum_mixer=AuditionMixer(self); self.active_row=None; self.active_drum_row=None; self.transport_slider=None; self.time_label=None; self.play_button=None; self.expanded=[]
         self.mixer.positionChanged.connect(self._active_position); self.mixer.durationChanged.connect(self._active_duration); self.mixer.playingChanged.connect(self._active_playing)
