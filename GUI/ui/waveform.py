@@ -30,8 +30,16 @@ class WaveformLoader(QObject):
         task=_WaveTask(path); task.signals.ready.connect(self.ready); self.tasks.append(task); self.pool.start(task)
 
 class WaveformWidget(QWidget):
-    def __init__(self,parent=None): super().__init__(parent); self.peaks=None; self.setMinimumWidth(150); self.setFixedHeight(38)
+    seekRequested=Signal(float)
+    def __init__(self,parent=None): super().__init__(parent); self.peaks=None; self.progress=0.0; self.setMinimumWidth(150); self.setFixedHeight(38); self.setCursor(Qt.CursorShape.PointingHandCursor)
     def set_peaks(self,peaks): self.peaks=peaks; self.update()
+    def set_progress(self,value): self.progress=max(0.0,min(1.0,float(value))); self.update()
+    def mousePressEvent(self,event):
+        if event.button()==Qt.MouseButton.LeftButton and self.width()>0:self.seekRequested.emit(event.position().x()/self.width())
+        super().mousePressEvent(event)
+    def mouseMoveEvent(self,event):
+        if event.buttons() & Qt.MouseButton.LeftButton and self.width()>0:self.seekRequested.emit(event.position().x()/self.width())
+        super().mouseMoveEvent(event)
     def paintEvent(self,event):
         p=QPainter(self); p.setRenderHint(QPainter.RenderHint.Antialiasing); mid=self.height()/2
         p.setPen(QPen(QColor("#2c3546"),1)); p.drawLine(0,int(mid),self.width(),int(mid))
@@ -40,3 +48,4 @@ class WaveformWidget(QWidget):
         for i,v in enumerate(self.peaks):
             x=i*xscale; y=amp*float(v); path.moveTo(x,mid-y); path.lineTo(x,mid+y)
         p.setPen(QPen(QColor("#9b6cff"),1)); p.drawPath(path)
+        x=int(self.progress*max(0,self.width()-1)); p.setPen(QPen(QColor("#f4f7ff"),2)); p.drawLine(x,2,x,self.height()-2)
