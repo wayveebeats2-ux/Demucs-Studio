@@ -1,9 +1,21 @@
 import os,sys,subprocess
 from pathlib import Path
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QCheckBox,QFileDialog,QFrame,QHBoxLayout,QLabel,QPushButton,QSlider,QVBoxLayout
+from PySide6.QtWidgets import QCheckBox,QFileDialog,QFrame,QHBoxLayout,QLabel,QPushButton,QSlider,QVBoxLayout,QStyle
 from ui.waveform import WaveformLoader,WaveformWidget
 from ui.audition import AuditionMixer
+
+class SeekSlider(QSlider):
+    def mousePressEvent(self,event):
+        if event.button()==Qt.MouseButton.LeftButton:
+            value=QStyle.sliderValueFromPosition(self.minimum(),self.maximum(),int(event.position().x()),max(1,self.width()))
+            self.setValue(value); self.sliderMoved.emit(value); event.accept(); return
+        super().mousePressEvent(event)
+    def mouseMoveEvent(self,event):
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            value=QStyle.sliderValueFromPosition(self.minimum(),self.maximum(),int(event.position().x()),max(1,self.width()))
+            self.setValue(value); self.sliderMoved.emit(value); event.accept(); return
+        super().mouseMoveEvent(event)
 
 class StemResults(QFrame):
     def __init__(self,parent=None):
@@ -12,7 +24,7 @@ class StemResults(QFrame):
     def show_results(self,row,folder,outputs):
         self.hint.hide(); divider=QFrame(); divider.setFrameShape(QFrame.Shape.HLine); self.layout.addWidget(divider); group={"folder":folder,"stems":list(outputs),"state":{stem:{"mute":False,"solo":False,"db":0.0} for stem,_ in outputs}}; self.groups[row]=group
         head=QHBoxLayout(); label=QLabel("✓  "+Path(folder).parent.name); label.setObjectName("success"); audition=QPushButton("▶ Play Mix"); audition.setObjectName("primary"); stop=QPushButton("■ Stop"); export=QPushButton("Export Mix"); export.clicked.connect(lambda checked=False,r=row:self._export_mix(r)); open_btn=QPushButton("Open Folder"); audition.clicked.connect(lambda checked=False,r=row:self._toggle_mix(r)); stop.clicked.connect(self.mixer.stop); open_btn.clicked.connect(lambda:self.open_folder(folder)); head.addWidget(label); head.addStretch(); head.addWidget(audition); head.addWidget(stop); head.addWidget(export); head.addWidget(open_btn); self.layout.addLayout(head)
-        transport=QHBoxLayout(); timeline=QSlider(Qt.Orientation.Horizontal); timeline.setRange(0,0); timeline.setTracking(True); clock=QLabel("0:00 / 0:00"); clock.setObjectName("muted"); timeline.sliderMoved.connect(lambda ms,r=row:self._seek(r,ms)); transport.addWidget(timeline,1); transport.addWidget(clock); self.layout.addLayout(transport)
+        transport=QHBoxLayout(); timeline=SeekSlider(Qt.Orientation.Horizontal); timeline.setRange(0,0); timeline.setTracking(True); clock=QLabel("0:00 / 0:00"); clock.setObjectName("muted"); timeline.sliderMoved.connect(lambda ms,r=row:self._seek(r,ms)); transport.addWidget(timeline,1); transport.addWidget(clock); self.layout.addLayout(transport)
         group["timeline"]=timeline; group["clock"]=clock; group["play_button"]=audition
         self.mixer.positionChanged.connect(lambda ms,r=row:self._position(r,ms)); self.mixer.durationChanged.connect(lambda ms,r=row:self._duration(r,ms)); self.mixer.playingChanged.connect(lambda playing,r=row:self._playing(r,playing))
         for stem,file in outputs:
